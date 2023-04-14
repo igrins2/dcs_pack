@@ -1,0 +1,9 @@
+[Unit]
+Description="DC-core Service"
+
+[Service]
+Type=simple
+ExecStart=/home/ics/dcs_pack/installation/run_dc_core.sh
+
+[Install]
+WantedBy=multi-user.target

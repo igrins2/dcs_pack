@@ -1,0 +1,130 @@
+### Installation for dcs ### 
+
+1. Download "dcs_pack" directory from GitHub.
+
+
+2. Unzip the compressed file "../dcs_pack/installation/macie_v5.2_centos.tar.gz" in the same folder
+
+
+3. Open and edit "../dcs_pack/installation/dc-core.service"
+ExecStart="your home directory"/dcs_pack/installation/run_dc_core.sh
+
+
+4. Check ethernet port in your system
+
+# firewall-cmd --get-active-zones
+-> public
+	interfaces: eno1 <---your ethernet port name
+
+In "dcs_setup.sh" and "run_dc_core.sh", write the name
+-> sudo firewall-cmd --zone=trusted --change-interface=eno1 <---here!
+
+
+5. Setup the macie library and python library
+
+$ cd $HOME/dcs_pack/installation
+$ sh dcs_setup.sh
+
+If some error is related to "sudo" command,
+follow next steps:
+
+# visudo /etc/sudoers
+
+## Allow root to run any commands anywhere
+root    ALL=(ALL)       ALL
+"your dcs name"    ALL=(ALL)       ALL <--add
+
+## Allows people in group wheel to run all commands
+%wheel  ALL=(ALL)       ALL
+"your dcs name"    ALL=(ALL)       ALL <--add
+
+## Same thing without a password
+# %wheel        ALL=(ALL)       NOPASSWD: ALL
+"your dcs name"            ALL=(ALL)       NOPASSWD: ALL <--add
+
+(if read-only error :wq -> :w!)
+
+After setup finished, exit the current terminal, open new terminal
+
+
+6. Set nfs mount
+dcs: server / ics, TelOps: client
+
+# dnf install nfs-utils
+
+# systemctl start nfs-server.service
+# systemctl enable nfs-server.service
+# systemctl status nfs-server.service
+
+# vi /etc/exports
+$HOME/DCS/Data 192.168.1.10(rw,sync,no_root_squash)
+$HOME/DCS/Data "ip address of TelOps"(rw,sync,no_root_squash)
+
+# exportfs -arv
+exporting 192.168.1.10:$HOME/DCS/Data
+exporting "ip address of TelOps":$HOME/DCS/Data
+
+# exportfs -s
+$HOME/DCS/Data  192.168.1.10(sync,wdelay,hide,no_subtree_check,sec=sys,rw,secure,no_root_squash,no_all_squash)
+$HOME/DCS/Data  "ip address of TelOps"(sync,wdelay,hide,no_subtree_check,sec=sys,rw,secure,no_root_squash,no_all_squash)
+
+
+# firewall-cmd --permanent --add-service=nfs
+# firewall-cmd --permanent --add-service=rpc-bind
+# firewall-cmd --permanent --add-service=mountd
+# firewall-cmd --reload
+
+
+7. Install rabbitmq server for local (between DC gui and DC core)
+$ yum install -y epel-release
+$ yum install -y erlang
+(yum install -y rabbitmq-server)
+$ wget https://github.com/rabbitmq/rabbitmq-server/releases/download/v3.8.9/rabbitmq-server-3.8.9-1.el7.noarch.rpm
+$ sudo rpm --import https://www.rabbitmq.com/rabbitmq-signing-key-public.asc
+$ sudo yum install -y rabbitmq-server-3.8.9-1.el7.noarch.rpm
+
+# rabbitmq-plugins enable rabbitmq_management
+# systemctl list-unit-files | grep rabbitmq-server
+# systemctl enable rabbitmq-server
+# systemctl start rabbitmq-server
+# rabbitmqctl list_users
+# rabbitmqctl add_user "your dcs name" kasi2023
+# rabbitmqctl set_user_tags "your dcs name" administrator
+# rabbitmqctl list_permissions
+# rabbitmqctl delete_user test
+# rabbitmqctl set_permissions -p / "your dcs name" ".*" ".*" ".*"
+
+@for reset queue (deleted users)
+->rabbitmqctl stop_app
+rabbitmqctl reset
+rabbitmqctl start_app
+
+@for firewall
+firewall-cmd --permanent --zone=public --add-port=5672/tcp
+firewall-cmd --reload
+
+@for registering service
+systemctl enable rabbitmq-server
+
+@for starting service
+systemctl start rabbitmq-server
+
+@for open tcp port!!
+firewall-cmd --permanent --zone=public --add-port=5672/tcp
+firewall-cmd --reload
+
+
+8. Start software
+
+$ sudo systemctl daemon-reload
+$ sudo systemctl start dc-core.service
+$ sudo systemctl status dc-core.service
+-> if some failure, 
+   $ sudo systemctl stop dc-core.service
+   $ sudo systemctl reset-failed (or $ setenforce 0)
+-> if you want to stop or use gui,
+   $ sudo systemctl stop dc-core.service
+   $ sh $HOME/dcs_pack/run_dc_gui.sh
+
+
+
