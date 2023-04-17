@@ -140,7 +140,6 @@ CMD_WRITEASICREG = "writeASICreg"
 CMD_READASICREG = "readASICreg"
 CMD_GETTELEMETRY = "GetTelemetry"
 
-CMD_REQ_TEMP = "ReqTempInfo"
 ALIVE = "Alive"
 
 CMD_INIT2_DONE = "Initialize2_Done"
