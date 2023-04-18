@@ -80,7 +80,7 @@ class DC_cli(threading.Thread):
                 "Options:\n"
                 "  -h, --help  Show this message and exit.\n\n"
                 "Command:\n"
-                "  showcommand show\n"  #help
+                "  show\n"  #help
                 "  initialize timeout\n"    #help
                 "  initialize2 muxtype outputs\n"   #help
                 "  setfsmode mode\n"    #help
