@@ -55,6 +55,7 @@ g++ -shared -o libsampling_cal.so sampling_cal.o
 
 
 # start core
+sudo chmod 744 $HOME/dcs_pack/installation/run_dc_core.sh
 sudo cp $HOME/dcs_pack/installation/dc-core.service /etc/systemd/system/
 
 

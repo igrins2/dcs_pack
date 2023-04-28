@@ -1,5 +1,5 @@
 [Unit]
-Description="DC-core Service"
+Description=DC-core Service
 
 [Service]
 Type=simple

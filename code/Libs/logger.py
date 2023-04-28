@@ -14,9 +14,9 @@ from time import localtime, strftime
 import Libs.SetConfig as sc
 class LOG():
 
-    def __init__(self, work_dir):
+    def __init__(self, work_dir, sub_dir):
                         
-        self.path = "%s/Log/" % (work_dir)
+        self.path = "%s/Log/%s/" % (work_dir, sub_dir)
         self.createFolder(self.path)
         
         

@@ -69,7 +69,7 @@ class DC_cli(threading.Thread):
         
     def callback(self, ch, method, properties, body):
         cmd = body.decode()
-        msg = "receive: %s" % cmd
+        msg = "<- [CORE] %s" % cmd
         print(msg)
         
     

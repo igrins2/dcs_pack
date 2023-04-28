@@ -122,9 +122,14 @@ $ sudo systemctl status dc-core.service
 -> if some failure, 
    $ sudo systemctl stop dc-core.service
    $ sudo systemctl reset-failed (or $ setenforce 0)
--> if you want to stop or use gui,
+
+after checking "ls -lh" in /dcs_pack/installation/run_dc_core.sh
+=> sudo chmod 744 run_dc_core.sh
+
+-> if you want to stop,
    $ sudo systemctl stop dc-core.service
-   $ sh $HOME/dcs_pack/run_dc_gui.sh
+-> if you want to use gui,
+   $ sh $HOME/dcs_pack/run_dcs.sh gui
 
 
 

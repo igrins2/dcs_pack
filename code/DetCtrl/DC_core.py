@@ -72,9 +72,8 @@ FieldNames = [('pressure', float),
 class DC(threading.Thread):
     def __init__(self):
         
-        self.log = LOG(WORKING_DIR + "DCS")
-
         self._iam = "CORE"
+        self.log = LOG(WORKING_DIR + "DCS", self._iam)        
         self._target = "GUI"
 
         self.log.send(self._iam, INFO, "start DCS core!!!")
@@ -214,6 +213,13 @@ class DC(threading.Thread):
         self.producer[ICS] = MsgMiddleware(IAM, self.ics_ip_addr, self.ics_id, self.ics_pwd, IAM+'.ex')
         self.producer[ICS].connect_to_server()
         self.producer[ICS].define_producer()
+        
+        
+    def publish_to_ics_queue(self, msg):
+        self.producer[ICS].send_message(self.dcs_q, msg)
+        
+        msg = "%s -> [ICS]" % msg
+        self.log.send(IAM, INFO, msg)
 
 
     #---------------------------------------------------------------------------------------------
@@ -230,7 +236,7 @@ class DC(threading.Thread):
 
     def callback_InstSeq(self, ch, method, properties, body):
         cmd = body.decode()        
-        msg = "receive: %s" % cmd
+        msg = "<- [InstSeq] %s" % cmd
         self.log.send(IAM, INFO, msg)
         
         if self.acquiring:
@@ -260,7 +266,7 @@ class DC(threading.Thread):
         
     def callback_ObsApp(self, ch, method, properties, body):
         cmd = body.decode()        
-        msg = "receive: %s" % cmd
+        msg = "<- [ObsApp] %s" % cmd
         self.log.send(IAM, INFO, msg)
 
         if self.acquiring:
@@ -285,7 +291,7 @@ class DC(threading.Thread):
 
     def callback_dt(self, ch, method, properties, body):
         cmd = body.decode()        
-        msg = "receive: %s" % cmd
+        msg = "<- [DTP] %s" % cmd
         self.log.send(IAM, INFO, msg)
         
         if self.acquiring:
@@ -308,7 +314,7 @@ class DC(threading.Thread):
         # simulation mode
         if simul:
             if cmd == CMD_INIT2_DONE or cmd == CMD_INITIALIZE2_ICS or cmd  == CMD_SETFSPARAM_ICS:
-                self.producer[ICS].send_message(self.dcs_q, cmd) 
+                self.publish_to_ics_queue(cmd)
                 #print("Answer!!!")
             elif cmd == CMD_ACQUIRERAMP_ICS:                
                 ti.sleep(2)
@@ -318,13 +324,13 @@ class DC(threading.Thread):
                 folder_name = "%04d%02d%02d_%02d%02d%02d" % (cur_datetime[0], cur_datetime[1], cur_datetime[2], cur_datetime[3], cur_datetime[4], cur_datetime[5])
 
                 msg = "%s 5 %s" % (cmd, folder_name)
-                self.producer[ICS].send_message(self.dcs_q, msg)
+                self.publish_to_ics_queue(msg)
             
-                msg = "send: %s" % msg
+                msg = "%s ->" % msg
                 self.log.send(IAM, INFO, msg)
 
             elif cmd == CMD_STOPACQUISITION:
-                self.producer[ICS].send_message(self.dcs_q, cmd)
+                self.publish_to_ics_queue(cmd)
             
             return
 
@@ -335,12 +341,12 @@ class DC(threading.Thread):
 
         if cmd == CMD_INIT2_DONE:
             if self.init2:
-                self.producer[ICS].send_message(self.dcs_q, cmd)  
+                self.publish_to_ics_queue(cmd)
 
         if cmd == CMD_STOPACQUISITION:
             self.stop = True
             if self.StopAcquisition():
-                self.producer[ICS].send_message(self.dcs_q, cmd)
+                self.publish_to_ics_queue(cmd)
 
 
     #-------------------------------
@@ -362,7 +368,7 @@ class DC(threading.Thread):
         if len(param) < 2:
             return
         
-        msg = "receive: %s" % cmd
+        msg = "<- [DB uploader] %s" % cmd
         self.log.send(self._iam, INFO, msg)
 
         if param[0] == UPLOAD_Q:
@@ -381,6 +387,13 @@ class DC(threading.Thread):
         self.producer[LOCAL] = MsgMiddleware(self._iam, "localhost", self.myid, self.pwd, self.core_ex)
         self.producer[LOCAL].connect_to_server()
         self.producer[LOCAL].define_producer()
+        
+        
+    def publish_to_local_queue(self, msg):
+        self.producer[LOCAL].send_message(self.core_q, msg)
+        
+        msg = "%s -> [GUI]" % msg
+        self.log.send(self._iam, INFO, msg)
 
 
     def connect_to_server_q(self):
@@ -394,7 +407,7 @@ class DC(threading.Thread):
 
     def callback(self, ch, method, properties, body):
         cmd = body.decode()
-        msg = "receive: %s" % cmd
+        msg = "<- [GUI] %s" % cmd
         self.log.send(self._iam, INFO, msg)
 
         self.param = cmd
@@ -402,13 +415,14 @@ class DC(threading.Thread):
         param = self.param.split()
         if param[0] == CMD_VERSION:
             msg = "%s %s" % (CMD_VERSION, self.LibVersion())
-            self.producer[LOCAL].send_message(self.core_q, msg)
+            self.publish_to_local_queue(msg)
+            
 
         elif param[0] == CMD_SHOWFITS:
             self.showfits = bool(int(param[1]))
             
-        elif param[0] == CMD_EXIT:
-            self.__del__()
+        #elif param[0] == CMD_EXIT:
+        #    self.__del__()
 
         elif param[0] == CMD_SETFSMODE:
             self.samplingMode = int(param[1]) 
@@ -423,7 +437,7 @@ class DC(threading.Thread):
         elif param[0] == CMD_STOPACQUISITION:
             self.stop = True
             if self.StopAcquisition():
-                self.producer[LOCAL].send_message(self.core_q, CMD_STOPACQUISITION)
+                self.publish_to_local_queue(CMD_STOPACQUISITION)
 
 
     def control_MACIE(self):
@@ -439,7 +453,7 @@ class DC(threading.Thread):
             if param[0] == CMD_INITIALIZE1:            
                 if self.Initialize(int(param[1])):
                     msg = "%s %.2f %s" % (CMD_INITIALIZE1, lib.MACIE_LibVersion(), self.pCard[self.slctCard].contents.macieSerialNumber)
-                    self.producer[LOCAL].send_message(self.core_q, msg)
+                    self.publish_to_local_queue(msg)
 
             elif param[0] == CMD_INITIALIZE2:
                 if self.Initialize2() == False:
@@ -449,11 +463,11 @@ class DC(threading.Thread):
                 if self.DownloadMCD() == False:
                     continue
                 if self.SetDetector(int(param[1]), int(param[2])):
-                    self.producer[LOCAL].send_message(self.core_q, CMD_INITIALIZE2)
+                    self.publish_to_local_queue(CMD_INITIALIZE2)
 
             elif param[0] == CMD_RESET:
                 if self.ResetASIC():
-                    self.producer[LOCAL].send_message(self.core_q, CMD_RESET)
+                    self.publish_to_local_queue(CMD_RESET)
 
             elif param[0] == CMD_SETRAMPPARAM:
                 self.expTime = float(param[1])
@@ -469,12 +483,12 @@ class DC(threading.Thread):
                     if self.AcquireRamp() == False:
                         continue
                     if self.ImageAcquisition():
-                        self.producer[LOCAL].send_message(self.core_q, CMD_ACQUIRERAMP)
+                        self.publish_to_local_queue(CMD_ACQUIRERAMP)
                 else:
                     if self.AcquireRamp_window() == False:
                         continue
                     if self.ImageAcquisition_window():
-                        self.producer[LOCAL].send_message(self.core_q, CMD_ACQUIRERAMP)
+                        self.publish_to_local_queue(CMD_ACQUIRERAMP)
 
             elif param[0] == CMD_ASICLOAD:
                 _read = [0 for _ in range(4)]
@@ -490,14 +504,14 @@ class DC(threading.Thread):
                     idx += 2
 
                 msg = "%s %s %s %s %s" % (CMD_ASICLOAD, _read[0], _read[1], _read[2], _read[3])
-                self.producer[LOCAL].send_message(self.core_q, msg)
+                self.publish_to_local_queue(msg)
 
             elif param[0] == CMD_WRITEASICREG:
                 res = self.write_ASIC_reg(int(param[1]), int(param[2]))
                 if res == MACIE_OK:
                     result = RET_OK
                     msg = "%s %s" % (CMD_WRITEASICREG, param[1])
-                    self.producer[LOCAL].send_message(self.core_q, msg)
+                    self.publish_to_local_queue(msg)
                 else:
                     result = RET_FAIL
                 msg = "WriteASICReg %s - h%04x = %04x" % (result, int(param[1]), int(param[2]))
@@ -509,7 +523,7 @@ class DC(threading.Thread):
                     result = RET_OK
                     _value = val[0]
                     msg = "%s %s %d" % (CMD_READASICREG, param[1], _value)
-                    self.producer[LOCAL].send_message(self.core_q, msg)
+                    self.publish_to_local_queue(msg)
                 else:
                     result = RET_FAIL
                     _value = 0
@@ -530,7 +544,7 @@ class DC(threading.Thread):
                 if self.DownloadMCD() == False:
                     continue
                 if self.SetDetector(MUX_TYPE, 32):
-                    self.producer[ICS].send_message(self.dcs_q, param[0])
+                    self.publish_to_ics_queue(param[0])
 
             elif param[0] == CMD_SETFSPARAM_ICS:
                 self.samplingMode = FOWLER_MODE
@@ -543,14 +557,14 @@ class DC(threading.Thread):
                 #    msg = "%s %.3f %s" % (param[0], self.measured_durationT, self.folder_name)
                 #else:
                 #    msg = CMD_STOPACQUISITION
-                self.producer[ICS].send_message(self.dcs_q, param[0])
+                self.publish_to_ics_queue(param[0])
 
             elif param[0] == CMD_ACQUIRERAMP_ICS:
                 if self.AcquireRamp() == False:
                     continue
                 if self.ImageAcquisition(False):
                     msg = "%s %.3f %s" % (param[0], self.measured_durationT, self.folder_name)
-                    self.producer[ICS].send_message(self.dcs_q, msg)
+                    self.publish_to_ics_queue(msg)
                 else:
                     msg = CMD_STOPACQUISITION
 
@@ -1368,7 +1382,7 @@ class DC(threading.Thread):
             self.measured_durationT = ti.time() - self.measured_startT
             if local:
                 msg = "%s %.3f %s" % (CMD_MEASURETIME, self.measured_durationT, filename)
-                self.producer[LOCAL].send_message(self.core_q, msg)
+                self.publish_to_local_queue(msg)
                 ti.sleep(0.5)
 
             if local and self.showfits and self.ramps == 1 and self.groups == 1 and self.reads == 1:
@@ -1468,7 +1482,7 @@ class DC(threading.Thread):
         self.measured_durationT = ti.time() - self.measured_startT
         if local:
             msg = "%s %.3f %s" % (CMD_MEASURETIME, self.measured_durationT, path + "Result/" + filename)
-            self.producer[LOCAL].send_message(self.core_q, msg)
+            self.publish_to_local_queue(msg)
 
         if local and self.showfits:
             ds9 = WORKING_DIR + 'DCS/ds9'

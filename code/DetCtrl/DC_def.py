@@ -10,8 +10,9 @@ Modified on Dec 30, 2022
 CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
 
 import os
-dir = os.getcwd().split("/")
+#dir = os.getcwd().split("/")
 #print(dir)
+dir = ["", "home", "ics"]
 WORKING_DIR = "/" + dir[1] + "/" + dir[2] + "/"
 IAM = "DCSS"
 TARGET = "DTP"

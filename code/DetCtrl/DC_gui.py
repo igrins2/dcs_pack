@@ -36,9 +36,8 @@ class MainWindow(Ui_Dialog, QMainWindow):
         self.setWindowTitle("Detector Control System 1.0")
         self.setFixedSize(921, 641)
 
-        self.log = LOG(WORKING_DIR + "DCS")
-
         self._iam = "GUI"
+        self.log = LOG(WORKING_DIR + "DCS", self._iam)        
         self._target = "CORE"
 
         self.log.send(self._iam, INFO, "start DCS gui!!!")        
@@ -142,7 +141,7 @@ class MainWindow(Ui_Dialog, QMainWindow):
     def closeEvent(self, event: QCloseEvent) -> None:
         self.log.send(self._iam, INFO, "DCS gui closing...")
 
-        self.producer.send_message(self.gui_q, CMD_EXIT)
+        self.publish_to_queue(CMD_EXIT)
 
         for th in threading.enumerate():
             self.log.send(self._iam, INFO, th.name + " exit.")
@@ -163,6 +162,13 @@ class MainWindow(Ui_Dialog, QMainWindow):
         self.producer = MsgMiddleware(self._iam, "localhost", self.myid, self.pwd, self.gui_ex)
         self.producer.connect_to_server()
         self.producer.define_producer()
+        
+        
+    def publish_to_queue(self, msg):
+        self.producer.send_message(self.gui_q, msg)
+        
+        msg = "%s -> [CORE]" % msg
+        self.log.send(self._iam, INFO, msg)
 
             
     def connect_to_server_q(self):
@@ -175,13 +181,13 @@ class MainWindow(Ui_Dialog, QMainWindow):
         th.daemon = True
         th.start() 
         
-        self.producer.send_message(self.gui_q, CMD_VERSION)
+        self.publish_to_queue(CMD_VERSION)
 
 
     def callback(self, ch, method, properties, body):
         cmd = body.decode()
-        #msg = "receive: %s" % cmd
-        #self.log.send(self._iam, INFO, msg)
+        msg = "<- [CORE] %s" % cmd
+        self.log.send(self._iam, INFO, msg)
 
         param = cmd.split()
 
@@ -431,7 +437,7 @@ class MainWindow(Ui_Dialog, QMainWindow):
         self.QWidgetBtnColor(self.btn_initialize1, "yellow", "blue")
 
         msg = "%s %s" % (CMD_INITIALIZE1, self.e_timeout.text())
-        self.producer.send_message(self.gui_q, msg)
+        self.publish_to_queue(msg)
 
 
     def initialize2(self):
@@ -443,7 +449,7 @@ class MainWindow(Ui_Dialog, QMainWindow):
         self.QWidgetBtnColor(self.btn_initialize2, "yellow", "blue")
 
         msg = "%s %d %s" % (CMD_INITIALIZE2, MUX_TYPE, self.cmb_ouput_channels.currentText())
-        self.producer.send_message(self.gui_q, msg)
+        self.publish_to_queue(msg)
 
 
     def reset(self):
@@ -454,7 +460,7 @@ class MainWindow(Ui_Dialog, QMainWindow):
 
         self.QWidgetBtnColor(self.btn_reset, "yellow", "blue")
 
-        self.producer.send_message(self.gui_q, CMD_RESET)
+        self.publish_to_queue(CMD_RESET)
 
     '''
     def downloadMCD(self):
@@ -570,7 +576,7 @@ class MainWindow(Ui_Dialog, QMainWindow):
         ramps = int(self.e_ramps.text())
 
         msg = "%s %d" % (CMD_SETFSMODE, self.samplingMode)
-        self.producer.send_message(self.gui_q, msg)
+        self.publish_to_queue(msg)
 
         self.cal_waittime = 0.0
         if self.samplingMode == UTR_MODE:
@@ -580,7 +586,7 @@ class MainWindow(Ui_Dialog, QMainWindow):
             self.cal_waittime = T_br + ((T_frame * resets) + self.expTime) * ramps
             
             msg = "%s %.3f %d %d %d %d %d" % (CMD_SETRAMPPARAM, self.expTime, resets, reads, groups, drops, ramps)
-            self.producer.send_message(self.gui_q, msg)
+            self.publish_to_queue(msg)
 
             str_exp_time = "%.3f" % self.expTime
             self.e_exp_time.setText(str_exp_time)     
@@ -611,7 +617,7 @@ class MainWindow(Ui_Dialog, QMainWindow):
             self.cal_waittime = T_br + ((T_frame * resets) + fowlerTime + (2 * T_frame * reads)) * ramps
   
             msg = "%s %.3f %d %d %d %.3f %d" % (CMD_SETFSPARAM, self.expTime, resets, reads, groups, fowlerTime, ramps)
-            self.producer.send_message(self.gui_q, msg)
+            self.publish_to_queue(msg)
         
         str_caltime = "%.3f" % self.cal_waittime
         self.label_calculated_time.setText(str_caltime)
@@ -654,7 +660,7 @@ class MainWindow(Ui_Dialog, QMainWindow):
             self.y_start = int(self.e_y_start.text())
             self.y_stop = int(self.e_y_stop.text())
             msg = "%s %d %d %d %d" % (CMD_SETWINPARAM, self.x_start, self.x_stop, self.y_start, self.y_stop)
-            self.producer.send_message(self.gui_q, msg)
+            self.publish_to_queue(msg)
             ti.sleep(0.5)
         
         self.cur_cnt += 1
@@ -678,7 +684,7 @@ class MainWindow(Ui_Dialog, QMainWindow):
         self.elapsed_timer.start()
         
         msg = "%s %d" % (CMD_ACQUIRERAMP, self.chk_ROI_mode.isChecked())
-        self.producer.send_message(self.gui_q, msg)  
+        self.publish_to_queue(msg)
         
         
     def show_progressbar(self):
@@ -711,12 +717,12 @@ class MainWindow(Ui_Dialog, QMainWindow):
         self.prog_timer.stop()
         self.elapsed_timer.stop()
         
-        self.producer.send_message(self.gui_q, CMD_STOPACQUISITION)
+        self.publish_to_queue(CMD_STOPACQUISITION)
 
 
     def show_fits(self):
         msg = "%s %d" % (CMD_SHOWFITS, self.chk_show_fits.isChecked())
-        self.producer.send_message(self.gui_q, msg)
+        self.publish_to_queue(msg)
 
         
     def use_saveAs(self):
@@ -752,7 +758,7 @@ class MainWindow(Ui_Dialog, QMainWindow):
             return
         self.busy = True
 
-        self.producer.send_message(self.gui_q, CMD_GETTELEMETRY)
+        self.publish_to_queue(CMD_GETTELEMETRY)
 
 
     def find_dir_file(self, find_option):
@@ -789,7 +795,7 @@ class MainWindow(Ui_Dialog, QMainWindow):
             self.e_addr_Dsub.text(), self.e_write_Dsub.text(), \
                 self.e_addr_Vbiasgate.text(), self.e_write_Vbiasgate.text(), \
                     self.e_addr_Vrefmain.text(), self.e_write_Vrefmain.text())
-        self.producer.send_message(self.gui_q, msg)
+        self.publish_to_queue(msg)
 
 
 
@@ -801,7 +807,7 @@ class MainWindow(Ui_Dialog, QMainWindow):
         _value = int("0x" + value, 16)
 
         msg = "%s %d %d" % (CMD_WRITEASICREG, _addr, _value)
-        self.producer.send_message(self.gui_q, msg)
+        self.publish_to_queue(msg)
         
 
 
@@ -812,7 +818,7 @@ class MainWindow(Ui_Dialog, QMainWindow):
         _addr = int("0x" + addr, 16)
 
         msg = "%s %d" % (CMD_READASICREG, _addr)
-        self.producer.send_message(self.gui_q, msg)
+        self.publish_to_queue(msg)
 
 
     def QWidgetBtnColor(self, widget, textcolor, bgcolor=None):
