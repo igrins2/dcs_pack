@@ -1577,7 +1577,7 @@ class DC(threading.Thread):
         pHeaders[header_cnt] = MACIE_FitsHdr(key="FOWLTIME".encode(), valType=HDR_FLOAT, fVal=self.fowlerTime, comment="sec, Fowler Time".encode())
         header_cnt += 1
 
-        pHeaders[header_cnt] = MACIE_FitsHdr(key="ASICGAIN".encode(), valType=HDR_INT, iVal=self.preampGain, comment="8 (12dB, large cin)".encode())
+        pHeaders[header_cnt] = MACIE_FitsHdr(key="ASICGAIN".encode(), valType=HDR_INT, iVal=self.preampGain, comment="8 (12dB, large Cin)".encode())
         header_cnt += 1
 
         val = "0x%04x" % self.preampInputVal
@@ -1673,7 +1673,7 @@ class DC(threading.Thread):
             pHeaders[header_cnt] = MACIE_FitsHdr(key="T_SHTOP".encode(), valType=HDR_FLOAT, fVal=self.dewar_dict["shieldtop"], comment="Dewar Temp. Rad. Shield".encode())
             header_cnt += 1
 
-            pHeaders[header_cnt] = MACIE_FitsHdr(key="T_AIR".encode(), valType=HDR_FLOAT, fVal=self.dewar_dict["air"], comment="Dewar Temp. Rack Ambient".encode())
+            pHeaders[header_cnt] = MACIE_FitsHdr(key="T_AIR".encode(), valType=HDR_FLOAT, fVal=self.dewar_dict["air"], comment="Dewar Temp. Rack".encode())
             header_cnt += 1
 
         #-------------------------------------------------------------------------------------
