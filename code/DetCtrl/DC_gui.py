@@ -165,6 +165,9 @@ class MainWindow(Ui_Dialog, QMainWindow):
         
         
     def publish_to_queue(self, msg):
+        if self.producer == None:
+            return
+        
         self.producer.send_message(self.gui_q, msg)
         
         msg = "%s -> [CORE]" % msg

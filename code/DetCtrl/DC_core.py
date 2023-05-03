@@ -216,6 +216,9 @@ class DC(threading.Thread):
         
         
     def publish_to_ics_queue(self, msg):
+        if self.producer[ICS] == None:
+            return
+        
         self.producer[ICS].send_message(self.dcs_q, msg)
         
         msg = "%s -> [ICS]" % msg
@@ -390,6 +393,9 @@ class DC(threading.Thread):
         
         
     def publish_to_local_queue(self, msg):
+        if self.producer[LOCAL] == None:
+            return
+        
         self.producer[LOCAL].send_message(self.core_q, msg)
         
         msg = "%s -> [GUI]" % msg
@@ -1534,7 +1540,7 @@ class DC(threading.Thread):
 
         y, m, d = cur_datetime[0], cur_datetime[1], cur_datetime[2]
         _h, _m, _s, _ms = cur_datetime[3], cur_datetime[4], cur_datetime[5], cur_datetime[6]
-        obs_datetime = "%04d-%02d-%02dT%02d:%02d:%02d.%d" % (y, m, d, _h, _m, _s, _ms)
+        obs_datetime = "%04d-%02d-%02dT%02d:%02d:%02d.%03d" % (y, m, d, _h, _m, _s, _ms)
 
         t = Time(obs_datetime, format='isot', scale='utc')
         julian = t.to_value('jd', 'long')
