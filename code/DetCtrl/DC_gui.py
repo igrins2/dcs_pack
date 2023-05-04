@@ -221,10 +221,10 @@ class MainWindow(Ui_Dialog, QMainWindow):
             self.btn_initialize1.setEnabled(False)
         
         elif param[0] == CMD_INITIALIZE2:
-            self.QWidgetBtnColor(self.btn_initialize2, "black", "white")
+            self.QWidgetBtnColor(self.btn_initialize2, "black")
 
         elif param[0] == CMD_RESET:
-            self.QWidgetBtnColor(self.btn_reset, "black", "white")
+            self.QWidgetBtnColor(self.btn_reset, "black")
 
         #elif param[0] == CMD_DOWNLOAD:
         #    pass
@@ -244,7 +244,7 @@ class MainWindow(Ui_Dialog, QMainWindow):
 
         elif param[0] == CMD_ACQUIRERAMP:
 
-            self.QWidgetBtnColor(self.btn_acquireramp, "black", "white")
+            self.QWidgetBtnColor(self.btn_acquireramp, "black")
 
             self.prog_timer.stop()
             self.cur_prog_step = 100
@@ -715,7 +715,7 @@ class MainWindow(Ui_Dialog, QMainWindow):
         if self.cur_prog_step == 0:
             return
 
-        self.QWidgetBtnColor(self.btn_acquireramp, "black", "white")
+        self.QWidgetBtnColor(self.btn_acquireramp, "black")
 
         self.prog_timer.stop()
         self.elapsed_timer.stop()
