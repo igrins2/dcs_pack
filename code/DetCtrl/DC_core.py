@@ -18,7 +18,6 @@ from math import *
 import time as ti
 import datetime
 import os, sys
-import json
 
 sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
 

@@ -3,25 +3,24 @@
 """
 Created on Mar 4, 2022
 
-Modified on Dec 30, 2022
+Modified on May 8, 2023
 
 @author: hilee
 """
-CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
 
-import os
-#dir = os.getcwd().split("/")
-#print(dir)
-dir = ["", "home", "ics"]
-WORKING_DIR = "/" + dir[1] + "/" + dir[2] + "/"
-IAM = "DCSS"
-TARGET = "DTP"
-if dir[2] == "dcsh":
-    IAM = "DCSH"
-elif dir[2] == "dcsk":
-    IAM = "DCSK"
-elif dir[2] == "dcss":
-    IAM = "DCSS"
+import sys
+
+import getpass
+user = getpass.getuser()
+
+try:
+    dir = sys.argv[0].split('/')
+    WORKING_DIR = "/home/%s/" % dir[2]
+    IAM = dir[2].upper()
+
+except:
+    WORKING_DIR = "/home/%s/" % user
+    IAM = user.upper()
 
 #FUN_OK = 1
 

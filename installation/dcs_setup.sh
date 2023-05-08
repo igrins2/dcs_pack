@@ -39,7 +39,7 @@ conda activate dcs
 pip install numpy
 pip install astropy
 pip install pyside6
-pip install PyQt5
+pip install pyqt5
 pip install pika
 
 

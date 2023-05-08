@@ -9,6 +9,9 @@
 3. Open and edit "../dcs_pack/installation/dc-core.service"
 ExecStart="your home directory"/dcs_pack/installation/run_dc_core.sh
 
+Open and edit "../dcs_pack/installation/run_dc_core.sh"
+HOME="your home directory"
+
 
 4. Check ethernet port in your system
 
@@ -131,5 +134,10 @@ after checking "ls -lh" in /dcs_pack/installation/run_dc_core.sh
 -> if you want to use gui,
    $ sh $HOME/dcs_pack/run_dcs.sh gui
 
+
+9. For starting "dc-core.service" automatically when system is rebooting,
+
+# vi /etc/selinux/config
+SELINUX = disabled
 
 
