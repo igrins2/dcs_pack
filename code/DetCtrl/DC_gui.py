@@ -33,7 +33,7 @@ class MainWindow(Ui_Dialog, QMainWindow):
         super().__init__()
 
         self.setupUi(self)
-        self.setWindowTitle("Detector Control System 1.0")
+        self.setWindowTitle("Detector Control System 2.0")
         self.setFixedSize(921, 641)
 
         self._iam = "GUI"
@@ -131,14 +131,23 @@ class MainWindow(Ui_Dialog, QMainWindow):
         self.producer = None
         self.consumer = None
 
+        self.param = ""
+
         self.connect_to_server_ex()
         self.connect_to_server_q()
 
         self.busy = False
-       
+
+        self.core_timer = QTimer(self)
+        self.core_timer.setInterval(100)
+        self.core_timer.timeout.connect(self.core_process)
+        self.core_timer.start()       
 
     
     def closeEvent(self, event: QCloseEvent) -> None:
+
+        self.core_timer.stop()
+
         self.log.send(self._iam, INFO, "DCS gui closing...")
 
         self.publish_to_queue(CMD_EXIT)
@@ -192,26 +201,33 @@ class MainWindow(Ui_Dialog, QMainWindow):
         msg = "<- [CORE] %s" % cmd
         self.log.send(self._iam, INFO, msg)
 
-        param = cmd.split()
+        self.param = cmd
+
+
+    def core_process(self):
+        if self.param == "":
+            return
+
+        param = self.param.split()
 
         self.busy = False            
 
         if param[0] == CMD_VERSION:
-            self.label_ver.setText(param[1])
+            if bool(int(param[3])):
+                info = "%s (%s)" % (param[1], param[2])
+                self.label_ver.setText(info)
 
-        elif param[0] == CMD_MEASURETIME:
-            self.label_measured_time.setText(param[1])
-            
-            if self.chk_autosave.isChecked():
-                self.fitsfullpath = param[2]
-                file = param[2].split("/")
-                path = ""
-                for i in file[1:-1]:
-                    path += "/"
-                    path += i
-                self.e_user_dir.setText(path)
-                self.e_user_file.setText(file[-1][:-5] + "_")
+                self.QWidgetBtnColor(self.btn_initialize1, "white", "green") 
+                self.btn_initialize1.setEnabled(False)
+                self.e_timeout.setEnabled(False)
 
+            else:
+                self.label_ver.setText(param[1])
+
+                self.QWidgetBtnColor(self.btn_initialize1, "black") 
+                self.btn_initialize1.setEnabled(True)
+                self.e_timeout.setEnabled(True)
+        
         elif param[0] == CMD_INITIALIZE1:          
             self.QWidgetBtnColor(self.btn_initialize1, "white", "green") 
 
@@ -219,6 +235,7 @@ class MainWindow(Ui_Dialog, QMainWindow):
             self.label_ver.setText(info)
 
             self.btn_initialize1.setEnabled(False)
+            self.e_timeout.setEnabled(False)
         
         elif param[0] == CMD_INITIALIZE2:
             self.QWidgetBtnColor(self.btn_initialize2, "black")
@@ -252,13 +269,33 @@ class MainWindow(Ui_Dialog, QMainWindow):
 
             self.elapsed_timer.stop()
 
+            self.fitsfullpath = param[2]
+
             show_cur_cnt = "%d / %s" % (self.cur_cnt, self.e_repeat.text())
             self.label_cur_num.setText(show_cur_cnt)
+
             if self.cur_cnt < int(self.e_repeat.text()):
                 #self.acquireramp()
+                #ti.sleep(0.5)
                 self.btn_acquireramp.click()
             else:
                 self.cur_cnt = 0
+
+            self.label_measured_time.setText(param[1])
+
+            if self.chk_show_fits.isChecked():
+                ds9 = WORKING_DIR + 'DCS/ds9'
+                subprocess.Popen([ds9, self.fitsfullpath])
+
+            if self.chk_autosave.isChecked():
+                file = param[2].split("/")
+                path = ""
+                for i in file[1:-1]:
+                    path += "/"
+                    path += i
+                self.e_user_dir.setText(path)
+                self.e_user_file.setText(file[-1][:-5] + "_")
+                       
 
         elif param[0] == CMD_STOPACQUISITION:
             pass
@@ -302,6 +339,8 @@ class MainWindow(Ui_Dialog, QMainWindow):
             pass
         else:
             pass
+
+        self.param = ""
     
 
 
@@ -378,7 +417,7 @@ class MainWindow(Ui_Dialog, QMainWindow):
         self.btn_acquireramp.clicked.connect(self.acquireramp)
         self.btn_stop.clicked.connect(self.stop_acquistion)
 
-        self.chk_show_fits.clicked.connect(self.show_fits)
+        #self.chk_show_fits.clicked.connect(self.show_fits)
 
         self.btn_get_telemetry.clicked.connect(self.get_telemetry)
 
@@ -655,6 +694,9 @@ class MainWindow(Ui_Dialog, QMainWindow):
             return
         self.busy = True
 
+        show_cur_cnt = "%d / %s" % (self.cur_cnt, self.e_repeat.text())
+        self.label_cur_num.setText(show_cur_cnt)
+
         self.QWidgetBtnColor(self.btn_acquireramp, "yellow", "blue")
 
         if self.chk_ROI_mode.isChecked():
@@ -723,9 +765,9 @@ class MainWindow(Ui_Dialog, QMainWindow):
         self.publish_to_queue(CMD_STOPACQUISITION)
 
 
-    def show_fits(self):
-        msg = "%s %d" % (CMD_SHOWFITS, self.chk_show_fits.isChecked())
-        self.publish_to_queue(msg)
+    #def show_fits(self):
+    #    msg = "%s %d" % (CMD_SHOWFITS, self.chk_show_fits.isChecked())
+    #    self.publish_to_queue(msg)
 
         
     def use_saveAs(self):

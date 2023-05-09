@@ -44,8 +44,8 @@ class DC_cli(threading.Thread):
         for th in threading.enumerate():
             print(th.name + " exit.")
             
-        #self.producer.channel.close()
-        #self.consumer.channel.close()
+        self.consumer.channel.close()
+        self.producer.channel.close()
     
     
     def connect_to_server_ex(self):
@@ -80,9 +80,10 @@ class DC_cli(threading.Thread):
                 "Options:\n"
                 "  -h, --help  Show this message and exit.\n\n"
                 "Command:\n"
-                "  show\n"  #help
-                "  initialize timeout\n"    #help
+                "  show\n"  
+                #"  initialize timeout\n"    #help
                 "  initialize2 muxtype outputs\n"   #help
+                "  resetASIC\n"
                 "  setfsmode mode\n"    #help
                 "  setwinparam xstart xstop ystart ystop\n" #help
                 "  setrampparam p1 p2 p3 p4 p5\n"   #help
@@ -132,31 +133,27 @@ class DC_cli(threading.Thread):
             if args[0] == "show":
                 args = self.show_func(True)
 
-            elif args[0] == "initialize":
-                _args = "timeout"
+            elif args[0] == "initialize2":
+                _args = "muxtype, outputs"
                 try:
                     if args[1] == "-h" or args[1] == "--help":
-                        self.show_subfunc(args[0], _args, "timeout: milisecond (default is 200ms)")
-                    elif int(args[1]) < 1:
-                        self.show_errmsg(_args)
+                        self.show_subfunc(args[0], _args, "muxtype:1/2/4, outputs:1/4/32")
+                    if len(args) != 3:
+                        self.show_noargs(args[0])
                     else:
-                        msg = "%s %s" % (CMD_INITIALIZE1, args[1])
+                        msg = "%s %s %s" % (CMD_INITIALIZE2, args[1], args[2])
                         self.producer.send_message(self.gui_q, msg)
                 except:
                     self.show_errmsg(_args)
 
-            elif args[0] == "initialize2":
-                if len(args) > 2:
-                    self.show_noargs(args[0])
-                else:
-                    msg = "%s %d %s" % (CMD_INITIALIZE2, args[1], args[2])
-                    self.producer.send_message(self.gui_q, msg)
-
             elif args[0] == "resetASIC":
-                if len(args) > 1:
-                    self.show_noargs(args[0])
-                else:
-                    self.producer.send_message(self.gui_q, CMD_RESET)
+                try:
+                    if len(args) > 1:
+                        self.show_noargs(args[0])
+                    else:
+                        self.producer.send_message(self.gui_q, CMD_RESET)
+                except:
+                    self.show_errmsg(_args)
 
             elif args[0] == "setfsmode":
                 _args = "mode"
@@ -177,7 +174,7 @@ class DC_cli(threading.Thread):
                 if args[1] == 1 and args[2] == 2048 and args[3] == 1 and args[4] == 2048:
                     self.roi_mode = False
                     
-                _args = "xstart xstop ystart ystop"
+                _args = "xstart, xstop, ystart, ystop"
                 try:
                     if args[1] == "-h" or args[1] == "--help":
                         self.show_subfunc(args[0], _args, "xstart: 1~2048, xstop: 1~2048, ystart: 1~2048, ystop: 1~2048")
@@ -194,7 +191,7 @@ class DC_cli(threading.Thread):
                 try:
                     if args[1] == "-h" or args[1] == "--help":
                         self.show_subfunc(args[0], _args, "p1: resets, p2: reads, p3: groups, p4: drops, p5: ramps")
-                    elif int(args[1]) < 1 or int(args[2]) < 1 or int(args[3]) < 1 or int(args[4]) < 1 or int(args[5]) < 1:
+                    elif int(args[1]) < 0 or int(args[2]) < 0 or int(args[3]) < 0 or int(args[4]) < 0 or int(args[5]) < 0:
                         print("Please input '>0' for each argument")
                     else:
                         expTime = (T_frame * int(args[2]) * int(args[3])) + (T_frame * int(args[4]) * (int(args[3]) -1 ))
@@ -238,9 +235,6 @@ class DC_cli(threading.Thread):
                 else:
                     self.producer.send_message(self.gui_q, CMD_GETTELEMETRY)
 
-            elif args[0] == "disconnect":
-                print("be getting ready")
-
             elif args[0] == "exit":
                 if len(args) > 1:
                     self.show_noargs(args[0])
@@ -262,5 +256,6 @@ if __name__ == "__main__":
         
     dc.start()
     
-    dc.consumer.channel.close()
-    dc.producer.channel.close()
+    dc.__del__()
+    #dc.consumer.channel.close()
+    #dc.producer.channel.close()

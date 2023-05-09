@@ -8,7 +8,7 @@ Modified on Mar 24, 2023
 @author: hilee
 """
 
-import subprocess
+#import subprocess
 import numpy as np
 import astropy.io.fits as fits
 from astropy.time import Time
@@ -124,6 +124,8 @@ class DC(threading.Thread):
 
         self.exe_path = cfg.get('DC', 'Img-dir')
         self.exe_path = WORKING_DIR + self.exe_path
+
+        self.gige_timeout = cfg.get('DC', 'timeout')
         #-------------------------------------------------------
 
         self.handle = 0
@@ -157,7 +159,7 @@ class DC(threading.Thread):
 
         self.measured_startT = 0
 
-        self.showfits = False
+        #self.showfits = False
 
         self.init1 = False  #for ics
         self.init2 = False  #for ics
@@ -419,12 +421,16 @@ class DC(threading.Thread):
 
         param = self.param.split()
         if param[0] == CMD_VERSION:
-            msg = "%s %s" % (CMD_VERSION, self.LibVersion())
+            if self.init1:
+                msg = "%s %s %s 1" % (CMD_VERSION, self.LibVersion(), self.pCard[self.slctCard].contents.macieSerialNumber)
+            else:
+                msg = "%s %s --- 0" % (CMD_VERSION, self.LibVersion())
+
             self.publish_to_local_queue(msg)
             
 
-        elif param[0] == CMD_SHOWFITS:
-            self.showfits = bool(int(param[1]))
+        #elif param[0] == CMD_SHOWFITS:
+        #    self.showfits = bool(int(param[1]))
             
         #elif param[0] == CMD_EXIT:
         #    self.__del__()
@@ -447,6 +453,8 @@ class DC(threading.Thread):
 
     def control_MACIE(self):
         
+        self.Initialize(int(self.gige_timeout))
+
         while True:
             if self.param == "":
                 continue     
@@ -455,9 +463,9 @@ class DC(threading.Thread):
 
             param = self.param.split()
             
-            if param[0] == CMD_INITIALIZE1:            
+            if param[0] == CMD_INITIALIZE1:  
                 if self.Initialize(int(param[1])):
-                    msg = "%s %.2f %s" % (CMD_INITIALIZE1, lib.MACIE_LibVersion(), self.pCard[self.slctCard].contents.macieSerialNumber)
+                    msg = "%s %s %s" % (CMD_INITIALIZE1, self.LibVersion(), self.pCard[self.slctCard].contents.macieSerialNumber)
                     self.publish_to_local_queue(msg)
 
             elif param[0] == CMD_INITIALIZE2:
@@ -483,12 +491,13 @@ class DC(threading.Thread):
                 self.SetFSParam(int(param[2]), int(param[3]), int(param[4]), float(param[5]), int(param[6]))
 
             elif param[0] == CMD_ACQUIRERAMP:
-                print("acquire!!!!")
+                #print("acquire!!!!")
                 if param[1] == "0":
                     if self.AcquireRamp() == False:
                         continue
                     if self.ImageAcquisition():
-                        self.publish_to_local_queue(CMD_ACQUIRERAMP)
+                        msg = "%s %.3f %s" % (CMD_ACQUIRERAMP, self.measured_durationT, self.full_path)
+                        self.publish_to_local_queue(msg)
                 else:
                     if self.AcquireRamp_window() == False:
                         continue
@@ -1274,7 +1283,7 @@ class DC(threading.Thread):
 
         lib.MACIE_CloseGigeScienceInterface(self.handle, self.slctMACIEs)
 
-        self.folder_name = self.WriteFitsFile(local)
+        self.folder_name, self.full_path = self.WriteFitsFile(local)
 
         return True
 
@@ -1294,7 +1303,7 @@ class DC(threading.Thread):
         getByte, frameSize = 0, 0
         frameSize = (self.x_stop - self.x_start + 1) * (self.y_stop - self.y_start + 1)
         getByte = frameSize * 2
-        print(getByte)
+        #print(getByte)
         
         byte = 0        
         for i in range(20):
@@ -1385,17 +1394,16 @@ class DC(threading.Thread):
                         idx += 1
 
             self.measured_durationT = ti.time() - self.measured_startT
-            if local:
-                msg = "%s %.3f %s" % (CMD_MEASURETIME, self.measured_durationT, filename)
-                self.publish_to_local_queue(msg)
-                ti.sleep(0.5)
-
+            
+            '''
             if local and self.showfits and self.ramps == 1 and self.groups == 1 and self.reads == 1:
                 ds9 = WORKING_DIR + 'DCS/ds9'
                 #subprocess.run([ds9, '-b', filename, '-o', 'newfile'], shell = True)
-                subprocess.Popen([ds9, filename])
+                subprocess.Popen(['sudo', ds9, filename])
+                self.log.send(self._iam, INFO, ds9)
+            '''
 
-            return
+            return '', filename
 
         elif self.samplingMode == CDS_MODE:  # ramp=1, group=1, read=1
             for read in range(self.reads*2):
@@ -1474,7 +1482,7 @@ class DC(threading.Thread):
         elif self.samplingMode == FOWLER_MODE:
             lastfilename = "%sH2RG_R01_M02_N%02d.fits" % (path, self.reads)
             #filename = "FowlerResult.fits"
-            filename = "SDC%s_%s.fits" % (IAM[:-1], folder_name)
+            filename = "SDC%s_%s.fits" % (IAM[-1], folder_name)
             
             self.save_fitsfile_final(lastfilename, path+"Result/", filename, self.reads, res)
 
@@ -1485,18 +1493,18 @@ class DC(threading.Thread):
         self.log.send(self._iam, INFO, tmp)
         
         self.measured_durationT = ti.time() - self.measured_startT
-        if local:
-            msg = "%s %.3f %s" % (CMD_MEASURETIME, self.measured_durationT, path + "Result/" + filename)
-            self.publish_to_local_queue(msg)
-
+        
+        '''
         if local and self.showfits:
             ds9 = WORKING_DIR + 'DCS/ds9'
             #subprocess.run([ds9, '-b', lastfilename, '-o', 'newfile'], shell = True)
             #subprocess.run([ds9, filename], shell = True)
             resfile = "%sResult/%s" % (path, filename)
-            subprocess.Popen([ds9, resfile])
+            subprocess.Popen(['sudo', ds9, resfile])
+            self.log.send(self._iam, INFO, ds9)
+        '''
 
-        return folder_name
+        return folder_name, path + "Result/" + filename
 
     
     def WriteFitsFile_window(self):
@@ -1591,8 +1599,8 @@ class DC(threading.Thread):
 
         #-------------------------------------------------------------------------------------
         #information
-        _name = IAM[:-1]
-        pHeaders[header_cnt] = MACIE_FitsHdr(key="BAND".encode(), valType=HDR_STR, sVal=_name, comment="Band name".encode())
+        _name = IAM[-1]
+        pHeaders[header_cnt] = MACIE_FitsHdr(key="BAND".encode(), valType=HDR_STR, sVal=_name.encode(), comment="Band name".encode())
         header_cnt += 1
         
         _num = self.pCard[0].contents.macieSerialNumber

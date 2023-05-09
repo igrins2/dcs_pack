@@ -1,3 +1,5 @@
+#!/bin/bash
+
 PYTHONBIN=$HOME/miniconda3/envs/dcs/bin/python
 
 source ~/.bash_profile

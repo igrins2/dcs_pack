@@ -1,0 +1,6 @@
+MACIE_Select 1
+LOAD MACIE_Registers_Slow.glf
+WAIT 100
+ASIC_Select 1
+LOAD HxRG_Main.mcd
+WAIT 100

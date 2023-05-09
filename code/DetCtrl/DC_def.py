@@ -118,8 +118,6 @@ UPLOAD_Q = "UploadDBQ"    #uploader
 
 CMD_SIMULATION = "Simulation"
 CMD_VERSION = "LibVersion"
-CMD_SHOWFITS = "ShowFits"
-CMD_MEASURETIME = "MeasuredDurationT"
 CMD_EXIT = "Exit"
 
 CMD_INITIALIZE1 = "Initialize1"

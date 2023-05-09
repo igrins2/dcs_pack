@@ -1,0 +1,3 @@
+
+2021-07-06T14:17:20:  Check MACIE communication interface...
+2021-07-06T14:17:20:  No communication interface found
