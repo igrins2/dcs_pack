@@ -173,6 +173,8 @@ class DC(threading.Thread):
 
         self.param = ""
 
+        ti.sleep(10)
+
         self.connect_to_server_dcs_ex() # InstSeq, DTP, ObsApp
         
         self.connect_to_server_InstSeq_q() 

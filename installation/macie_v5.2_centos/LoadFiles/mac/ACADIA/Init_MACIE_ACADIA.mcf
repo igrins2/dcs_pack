@@ -1,7 +1,0 @@
-MACIE_Select 1
-LOAD Config_MACIE_Output_Biases_ACADIA.glf
-WAIT 100
-
-ASIC_SELECT 1
-LOAD Config_ACADIA.glf
-LOAD TestADC_256x256 improved.ald
