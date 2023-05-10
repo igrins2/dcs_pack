@@ -44,8 +44,10 @@ class DC_cli(threading.Thread):
         for th in threading.enumerate():
             print(th.name + " exit.")
             
-        self.consumer.channel.close()
-        self.producer.channel.close()
+        if self.producer != None:
+            self.producer.__del__()
+        #self.consumer.channel.close()
+        #self.producer.channel.close()
     
     
     def connect_to_server_ex(self):
@@ -62,6 +64,7 @@ class DC_cli(threading.Thread):
         self.consumer.define_consumer(self.core_q, self.callback)
 
         th = threading.Thread(target=self.consumer.start_consumer)
+        th.daemon = True
         th.start() 
 
         self.producer.send_message(self.gui_q, CMD_VERSION)
