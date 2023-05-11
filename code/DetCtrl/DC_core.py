@@ -247,15 +247,11 @@ class DC(threading.Thread):
         
         if self.acquiring:
             return
-        
-        param = cmd.split()
-            
-        if IAM == "DCSS" and param[1] == "H_K":
-            return    
-        if not (param[1] == IAM or param[1] == "all"):
-            return
 
-        self.process_from_ICS(param[0], bool(int(param[2])))
+        if len(cmd.split()) < 3:
+            return
+        
+        self.process_from_ICS(cmd)
         
         
     #-------------------------------     
@@ -278,9 +274,7 @@ class DC(threading.Thread):
         if self.acquiring:
             return
         
-        param = cmd.split()
-        
-        self.process_from_ICS(param[0], bool(int(param[2])))
+        self.process_from_ICS(cmd)
         
         
     #---------------------------------------------------------------------------------------------
@@ -302,27 +296,28 @@ class DC(threading.Thread):
         
         if self.acquiring:
             return
-        
-        param = cmd.split()
-        
-        if len(param) < 2:
+
+        if len(cmd.split()) < 3:
             return
-            
+                            
+        self.process_from_ICS(cmd)
+    
+        
+    def process_from_ICS(self, cmd):
+
+        param = cmd.split()
+
         if IAM == "DCSS" and param[1] == "H_K":
             return    
         if not (param[1] == IAM or param[1] == "all"):
             return
 
-        self.process_from_ICS(param[0], bool(int(param[2])))
-    
-        
-    def process_from_ICS(self, cmd, simul):
         # simulation mode
-        if simul:
-            if cmd == CMD_INIT2_DONE or cmd == CMD_INITIALIZE2_ICS or cmd  == CMD_SETFSPARAM_ICS:
+        if bool(int(param[2])):
+            if param[0] == CMD_INIT2_DONE or param[0] == CMD_INITIALIZE2_ICS or param[0]  == CMD_SETFSPARAM_ICS:
                 self.publish_to_ics_queue(cmd)
                 #print("Answer!!!")
-            elif cmd == CMD_ACQUIRERAMP_ICS:                
+            elif param[0] == CMD_ACQUIRERAMP_ICS:                
                 ti.sleep(2)
 
                 _t = datetime.datetime.utcnow()
@@ -335,8 +330,8 @@ class DC(threading.Thread):
                 msg = "%s ->" % msg
                 self.log.send(IAM, INFO, msg)
 
-            elif cmd == CMD_STOPACQUISITION:
-                self.publish_to_ics_queue(cmd)
+            elif param[0] == CMD_STOPACQUISITION:
+                self.publish_to_ics_queue(param[0])
             
             return
 
@@ -345,14 +340,14 @@ class DC(threading.Thread):
 
         self.param = cmd
 
-        if cmd == CMD_INIT2_DONE:
+        if param[0] == CMD_INIT2_DONE:
             if self.init2:
-                self.publish_to_ics_queue(cmd)
+                self.publish_to_ics_queue(param[0])
 
-        if cmd == CMD_STOPACQUISITION:
+        if param[0] == CMD_STOPACQUISITION:
             self.stop = True
             if self.StopAcquisition():
-                self.publish_to_ics_queue(cmd)
+                self.publish_to_ics_queue(param[0])
 
 
     #-------------------------------
