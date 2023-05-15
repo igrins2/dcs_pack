@@ -242,8 +242,6 @@ class DC(threading.Thread):
 
     def callback_InstSeq(self, ch, method, properties, body):
         cmd = body.decode()        
-        msg = "<- [InstSeq] %s" % cmd
-        self.log.send(IAM, INFO, msg)
         
         if self.acquiring:
             return
@@ -251,7 +249,7 @@ class DC(threading.Thread):
         if len(cmd.split()) < 3:
             return
         
-        self.process_from_ICS(cmd)
+        self.process_from_ICS(cmd, "InstSeq")
         
         
     #-------------------------------     
@@ -268,13 +266,11 @@ class DC(threading.Thread):
         
     def callback_ObsApp(self, ch, method, properties, body):
         cmd = body.decode()        
-        msg = "<- [ObsApp] %s" % cmd
-        self.log.send(IAM, INFO, msg)
-
+        
         if self.acquiring:
             return
         
-        self.process_from_ICS(cmd)
+        self.process_from_ICS(cmd, "ObsApp")
         
         
     #---------------------------------------------------------------------------------------------
@@ -291,8 +287,6 @@ class DC(threading.Thread):
 
     def callback_dt(self, ch, method, properties, body):
         cmd = body.decode()        
-        msg = "<- [DTP] %s" % cmd
-        self.log.send(IAM, INFO, msg)
         
         if self.acquiring:
             return
@@ -300,10 +294,10 @@ class DC(threading.Thread):
         if len(cmd.split()) < 3:
             return
                             
-        self.process_from_ICS(cmd)
+        self.process_from_ICS(cmd, "DTP")
     
         
-    def process_from_ICS(self, cmd):
+    def process_from_ICS(self, cmd, where):
 
         param = cmd.split()
 
@@ -311,6 +305,9 @@ class DC(threading.Thread):
             return    
         if not (param[1] == IAM or param[1] == "all"):
             return
+
+        msg = "<- [%s] %s" % (cmd, where)
+        self.log.send(IAM, INFO, msg)
 
         # simulation mode
         if bool(int(param[2])):
@@ -575,9 +572,10 @@ class DC(threading.Thread):
                     continue
                 if self.ImageAcquisition(False):
                     msg = "%s %.3f %s" % (param[0], self.measured_durationT, self.folder_name)
-                    self.publish_to_ics_queue(msg)
+                    #self.publish_to_ics_queue(msg)
                 else:
                     msg = CMD_STOPACQUISITION
+                self.publish_to_ics_queue(msg)
 
             self.param = ""
             self.acquiring = False
