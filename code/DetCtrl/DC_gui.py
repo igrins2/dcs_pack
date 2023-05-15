@@ -754,6 +754,9 @@ class MainWindow(Ui_Dialog, QMainWindow):
 
 
     def stop_acquistion(self):
+        
+        self.busy = False
+        
         if self.cur_prog_step == 0:
             return
 

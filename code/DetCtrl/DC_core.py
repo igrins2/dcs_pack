@@ -242,13 +242,6 @@ class DC(threading.Thread):
 
     def callback_InstSeq(self, ch, method, properties, body):
         cmd = body.decode()        
-        
-        if self.acquiring:
-            return
-
-        if len(cmd.split()) < 3:
-            return
-        
         self.process_from_ICS(cmd, "InstSeq")
         
         
@@ -265,11 +258,7 @@ class DC(threading.Thread):
         
         
     def callback_ObsApp(self, ch, method, properties, body):
-        cmd = body.decode()        
-        
-        if self.acquiring:
-            return
-        
+        cmd = body.decode()                
         self.process_from_ICS(cmd, "ObsApp")
         
         
@@ -287,19 +276,22 @@ class DC(threading.Thread):
 
     def callback_dt(self, ch, method, properties, body):
         cmd = body.decode()        
-        
-        if self.acquiring:
-            return
-
-        if len(cmd.split()) < 3:
-            return
-                            
         self.process_from_ICS(cmd, "DTP")
     
         
     def process_from_ICS(self, cmd, where):
 
         param = cmd.split()
+
+        if len(param) < 3:
+            return
+
+        if param[0] == CMD_STOPACQUISITION:
+            self.stop = True
+            #print("received 'stop'!!!!!!")
+
+        if self.acquiring:
+            return
 
         if IAM == "DCSS" and param[1] == "H_K":
             return    
@@ -330,21 +322,10 @@ class DC(threading.Thread):
             elif param[0] == CMD_STOPACQUISITION:
                 self.publish_to_ics_queue(param[0])
             
-            return
-
-        if not self.init1:
-            return
-
-        self.param = cmd
-
-        if param[0] == CMD_INIT2_DONE:
-            if self.init2:
-                self.publish_to_ics_queue(param[0])
-
-        if param[0] == CMD_STOPACQUISITION:
-            self.stop = True
-            if self.StopAcquisition():
-                self.publish_to_ics_queue(param[0])
+        else:
+            if self.init1:
+                self.param = cmd
+       
 
 
     #-------------------------------
@@ -441,8 +422,7 @@ class DC(threading.Thread):
         
         elif param[0] == CMD_STOPACQUISITION:
             self.stop = True
-            if self.StopAcquisition():
-                self.publish_to_local_queue(CMD_STOPACQUISITION)
+            #self.publish_to_local_queue(CMD_STOPACQUISITION)
 
 
     def control_MACIE(self):
@@ -542,17 +522,20 @@ class DC(threading.Thread):
             elif param[0] == CMD_GETTELEMETRY:
                 self.GetTelemetry()
 
-            #--------------------------------------------------------
+            #--------------------------------------------------------         
 
-            elif (param[0] == CMD_INIT2_DONE and not self.init2) or param[0] == CMD_INITIALIZE2_ICS:
-                if self.Initialize2() == False:
-                    continue
-                if self.ResetASIC() == False:
-                    continue
-                if self.DownloadMCD() == False:
-                    continue
-                if self.SetDetector(MUX_TYPE, 32):
+            elif param[0] == CMD_INIT2_DONE or param[0] == CMD_INITIALIZE2_ICS:
+                if self.init2:
                     self.publish_to_ics_queue(param[0])
+                else:
+                    if self.Initialize2() == False:
+                        continue
+                    if self.ResetASIC() == False:
+                        continue
+                    if self.DownloadMCD() == False:
+                        continue
+                    if self.SetDetector(MUX_TYPE, 32):
+                        self.publish_to_ics_queue(param[0])
 
             elif param[0] == CMD_SETFSPARAM_ICS:
                 self.samplingMode = FOWLER_MODE
@@ -572,11 +555,11 @@ class DC(threading.Thread):
                     continue
                 if self.ImageAcquisition(False):
                     msg = "%s %.3f %s" % (param[0], self.measured_durationT, self.folder_name)
-                    #self.publish_to_ics_queue(msg)
+                    self.publish_to_ics_queue(msg)
                 else:
                     msg = CMD_STOPACQUISITION
-                self.publish_to_ics_queue(msg)
-
+                    self.publish_to_ics_queue(msg)
+            
             self.param = ""
             self.acquiring = False
 
