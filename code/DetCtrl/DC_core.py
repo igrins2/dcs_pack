@@ -304,7 +304,7 @@ class DC(threading.Thread):
         # simulation mode
         if bool(int(param[2])):
             if param[0] == CMD_INIT2_DONE or param[0] == CMD_INITIALIZE2_ICS or param[0]  == CMD_SETFSPARAM_ICS:
-                self.publish_to_ics_queue(cmd)
+                self.publish_to_ics_queue(param[0])
                 #print("Answer!!!")
             elif param[0] == CMD_ACQUIRERAMP_ICS:                
                 ti.sleep(2)
@@ -313,7 +313,7 @@ class DC(threading.Thread):
                 cur_datetime = [_t.year, _t.month, _t.day, _t.hour, _t.minute, _t.second, _t.microsecond]
                 folder_name = "%04d%02d%02d_%02d%02d%02d" % (cur_datetime[0], cur_datetime[1], cur_datetime[2], cur_datetime[3], cur_datetime[4], cur_datetime[5])
 
-                msg = "%s 5 %s" % (cmd, folder_name)
+                msg = "%s 5 %s" % (param[0], folder_name)
                 self.publish_to_ics_queue(msg)
             
                 msg = "%s ->" % msg
