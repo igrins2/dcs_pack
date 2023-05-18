@@ -128,6 +128,7 @@
 8. Start software
 	```
 	$ sudo systemctl daemon-reload
+	$ sudo systemctl enable dc-core.service
 	$ sudo systemctl start dc-core.service
 	$ sudo systemctl status dc-core.service
 	```
@@ -154,7 +155,7 @@
 	```
 	$ sh $HOME/dcs_pack/run_dcs.sh gui
 	```
-9. For starting "dc-core.service" automatically when system is rebooting,
+9. For starting "dc-core.service" without error automatically when system is rebooting,
 	
 	`# vi /etc/selinux/config`
 	```
