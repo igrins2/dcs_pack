@@ -24,8 +24,6 @@ except:
 
 #FUN_OK = 1
 
-# for test!!!
-IAM = "DCSS"
 FITS_HDR_CNT = 50
 
 FieldNames = [('date', str), ('time', str),

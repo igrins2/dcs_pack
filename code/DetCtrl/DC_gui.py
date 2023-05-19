@@ -160,8 +160,11 @@ class MainWindow(Ui_Dialog, QMainWindow):
 
         self.log.send(self._iam, INFO, "DCS gui closed!")
 
-        if self.producer != None:
-            self.producer.__del__()
+        self.consumer.channel.close()
+        self.producer.channel.close()
+        
+        #if self.producer != None:
+        #    self.producer.__del__()
 
         return super().closeEvent(event)
 

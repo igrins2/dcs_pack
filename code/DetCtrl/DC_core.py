@@ -1351,13 +1351,20 @@ class DC(threading.Thread):
         self.createFolder(path)
 
         #folder_name = "%04d%02d%02d_%02d%02d%02d" % (cur_datetime[0], cur_datetime[1], cur_datetime[2], cur_datetime[3], cur_datetime[4], cur_datetime[5])
-        folder_name = "%04d%02d%02d/" % (cur_datetime[0], cur_datetime[1], cur_datetime[2])
+        folder_name = "%04d%02d%02d" % (cur_datetime[0], cur_datetime[1], cur_datetime[2])
         path += folder_name + "/"
         self.createFolder(path)
 
-        numbers = list(map(int, os.listdir(path)))
-        next_idx = max(numbers) + 1
-        path2 += next_idx + "/"
+        dir_names = []
+        for names in os.listdir(path):
+            if names.find(".fits") < 0:
+                dir_names.append(names)
+        numbers = list(map(int, dir_names))
+        if len(numbers) > 0:
+            next_idx = max(numbers) + 1
+        else:
+            next_idx = 1
+        path2 = path + str(next_idx) + "/"
         self.createFolder(path2)
         
         idx = 0
@@ -1447,7 +1454,7 @@ class DC(threading.Thread):
         if self.samplingMode == CDS_MODE:
             lastfilename = "%sH2RG_R01_M01_N02.fits" % path2
             #filename = "CDSResult.fits"
-            filename = "SDC%s_CDSResult_%s_%d.fits" % (IAM[-1], folder_name, next_idx)
+            filename = "SDC%s_%s_%d.fits" % (IAM[-1], folder_name, next_idx)
             self.save_fitsfile_final(lastfilename, path, filename, self.reads, res)
         
         elif self.samplingMode == CDSNOISE_MODE:
@@ -1459,10 +1466,10 @@ class DC(threading.Thread):
                 lastfilename = "%sH2RG_R02_M01_N02.fits" % path2
                 if i < 2:
                     #filename = "CDSResult%d.fits" % (i+1)
-                    filename = "SDC%s_CDSResult%d_%s_%d.fits" % (IAM[-1], (i+1), folder_name, next_idx)
+                    filename = "SDC%s_%s_%d(%d).fits" % (IAM[-1], folder_name, next_idx, i+1)
                 else:
                     #filename = "CDSNoise.fits"
-                    filename = "SDC%s_CDSNoise_%s_%d.fits" % (IAM[-1], folder_name, next_idx)
+                    filename = "SDC%s_%s_%d.fits" % (IAM[-1], folder_name, next_idx)
 
                 self.save_fitsfile_final(lastfilename, path, filename, self.reads, reslist[i])
 
@@ -1493,7 +1500,7 @@ class DC(threading.Thread):
             self.log.send(self._iam, INFO, ds9)
         '''
 
-        return folder_name, path + "Result/" + filename
+        return folder_name, path + "/" + filename
 
     
     def WriteFitsFile_window(self):
