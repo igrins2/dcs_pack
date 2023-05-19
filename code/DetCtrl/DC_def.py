@@ -24,6 +24,8 @@ except:
 
 #FUN_OK = 1
 
+# for test!!!
+IAM = "DCSS"
 FITS_HDR_CNT = 50
 
 FieldNames = [('date', str), ('time', str),
@@ -115,6 +117,8 @@ ASICAddr = 0x6100
 ASICAddr_State = 0x6900
 
 UPLOAD_Q = "UploadDBQ"    #uploader
+
+OBSAPP_BUSY = "ObsAppBusy"
 
 CMD_SIMULATION = "Simulation"
 CMD_VERSION = "LibVersion"

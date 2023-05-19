@@ -3,7 +3,7 @@
 """
 Created on Mar 4, 2022
 
-Modified on Mar 24, 2023
+Modified on May 19, 2023
 
 @author: hilee
 """
@@ -289,6 +289,8 @@ class DC(threading.Thread):
         if param[0] == CMD_STOPACQUISITION:
             self.stop = True
             #print("received 'stop'!!!!!!")
+        elif param[0] == OBSAPP_BUSY:
+            self.stop = True
 
         if self.acquiring:
             return
@@ -1348,11 +1350,16 @@ class DC(threading.Thread):
             path += "Fowler/"
         self.createFolder(path)
 
-        #str = time.strftime("%Y%m%d_%H%M%S", time.localtime(time.time()))
-        folder_name = "%04d%02d%02d_%02d%02d%02d" % (cur_datetime[0], cur_datetime[1], cur_datetime[2], cur_datetime[3], cur_datetime[4], cur_datetime[5])
+        #folder_name = "%04d%02d%02d_%02d%02d%02d" % (cur_datetime[0], cur_datetime[1], cur_datetime[2], cur_datetime[3], cur_datetime[4], cur_datetime[5])
+        folder_name = "%04d%02d%02d/" % (cur_datetime[0], cur_datetime[1], cur_datetime[2])
         path += folder_name + "/"
         self.createFolder(path)
 
+        numbers = list(map(int, os.listdir(path)))
+        next_idx = max(numbers) + 1
+        path2 += next_idx + "/"
+        self.createFolder(path2)
+        
         idx = 0
         #------------------------------------------------------------------------
         if self.samplingMode == UTR_MODE:  # single mode
@@ -1360,7 +1367,7 @@ class DC(threading.Thread):
                 for group in range(self.groups):
                     for read in range(self.reads):
 
-                        filename = "%sH2RG_R%02d_M%02d_N%02d.fits" % (path, ramp + 1, group+1, read + 1)
+                        filename = "%sH2RG_R%02d_M%02d_N%02d.fits" % (path2, ramp + 1, group+1, read + 1)
                         sts = self.save_fitsfile_sub(idx, filename, cur_datetime, ramp+1, group+1, read+1)
 
                         if sts != MACIE_OK:
@@ -1385,7 +1392,7 @@ class DC(threading.Thread):
 
         elif self.samplingMode == CDS_MODE:  # ramp=1, group=1, read=1
             for read in range(self.reads*2):
-                filename = "%sH2RG_R01_M01_N%02d.fits" % (path, read + 1)
+                filename = "%sH2RG_R01_M01_N%02d.fits" % (path2, read + 1)
                 sts = self.save_fitsfile_sub(idx, filename, cur_datetime, 1, 1, read+1)
 
                 if sts != MACIE_OK:
@@ -1399,7 +1406,7 @@ class DC(threading.Thread):
         elif self.samplingMode == CDSNOISE_MODE:  # ramp=2, group=1, read=1
             for ramp in range(self.ramps):
                 for read in range(self.reads*2):
-                    filename = "%sH2RG_R%02d_M01_N%02d.fits" % (path, ramp + 1, read + 1)
+                    filename = "%sH2RG_R%02d_M01_N%02d.fits" % (path2, ramp + 1, read + 1)
                     sts = self.save_fitsfile_sub(idx, filename, cur_datetime, ramp + 1, 1, read+1)
 
                     if sts != MACIE_OK:
@@ -1413,7 +1420,7 @@ class DC(threading.Thread):
         elif self.samplingMode == FOWLER_MODE:  # ramp=1, group=1, read=1,2,4,8,16
             for group in range(2):
                 for read in range(self.reads):
-                    filename = "%sH2RG_R01_M%02d_N%02d.fits" % (path, group+1, read + 1)
+                    filename = "%sH2RG_R01_M%02d_N%02d.fits" % (path2, group+1, read + 1)
                     sts = self.save_fitsfile_sub(idx, filename, cur_datetime, 1, group+1, read+1)
 
                     if sts != MACIE_OK:
@@ -1438,9 +1445,10 @@ class DC(threading.Thread):
 
         filename = ""
         if self.samplingMode == CDS_MODE:
-            lastfilename = "%sH2RG_R01_M01_N02.fits" % path
-            filename = "CDSResult.fits"
-            self.save_fitsfile_final(lastfilename, path+"Result/", filename, self.reads, res)
+            lastfilename = "%sH2RG_R01_M01_N02.fits" % path2
+            #filename = "CDSResult.fits"
+            filename = "SDC%s_CDSResult_%s_%d.fits" % (IAM[-1], folder_name, next_idx)
+            self.save_fitsfile_final(lastfilename, path, filename, self.reads, res)
         
         elif self.samplingMode == CDSNOISE_MODE:
             reslist = []
@@ -1448,21 +1456,24 @@ class DC(threading.Thread):
                 start = FRAME_X * FRAME_Y
                 reslist.append(res[start*i:start*(i+1)])
 
-                lastfilename = "%sH2RG_R02_M01_N02.fits" % path
+                lastfilename = "%sH2RG_R02_M01_N02.fits" % path2
                 if i < 2:
-                    filename = "CDSResult%d.fits" % (i+1)
+                    #filename = "CDSResult%d.fits" % (i+1)
+                    filename = "SDC%s_CDSResult%d_%s_%d.fits" % (IAM[-1], (i+1), folder_name, next_idx)
                 else:
-                    filename = "CDSNoise.fits"
+                    #filename = "CDSNoise.fits"
+                    filename = "SDC%s_CDSNoise_%s_%d.fits" % (IAM[-1], folder_name, next_idx)
 
-                self.save_fitsfile_final(lastfilename, path+"Result/", filename, self.reads, reslist[i])
+                self.save_fitsfile_final(lastfilename, path, filename, self.reads, reslist[i])
 
 
         elif self.samplingMode == FOWLER_MODE:
-            lastfilename = "%sH2RG_R01_M02_N%02d.fits" % (path, self.reads)
+            lastfilename = "%sH2RG_R01_M02_N%02d.fits" % (path2, self.reads)
             #filename = "FowlerResult.fits"
-            filename = "SDC%s_%s.fits" % (IAM[-1], folder_name)
+            #filename = "SDC%s_%s.fits" % (IAM[-1], folder_name)
+            filename = "SDC%s_%s_%d.fits" % (IAM[-1], folder_name, next_idx)
             
-            self.save_fitsfile_final(lastfilename, path+"Result/", filename, self.reads, res)
+            self.save_fitsfile_final(lastfilename, path, filename, self.reads, res)
 
         #-----------------------------------------------------------------------
         
