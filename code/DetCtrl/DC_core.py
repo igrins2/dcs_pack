@@ -1500,7 +1500,7 @@ class DC(threading.Thread):
             self.log.send(self._iam, INFO, ds9)
         '''
 
-        return folder_name, path + "/" + filename
+        return folder_name + "/" + filename, path + "/" + filename
 
     
     def WriteFitsFile_window(self):
