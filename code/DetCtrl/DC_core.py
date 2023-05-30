@@ -3,7 +3,7 @@
 """
 Created on Mar 4, 2022
 
-Modified on May 19, 2023
+Modified on May 30, 2023
 
 @author: hilee
 """
@@ -147,7 +147,16 @@ class DC(threading.Thread):
         self.preampInputVal = 0x4502    # 0xaaaa
         self.preampGain = 8  # 1
 
-        self.V_refmain = 0
+        # hardware addr
+        self.V_reset_addr = ""
+        self.D_sub_addr = ""
+        self.V_biasgate_addr = ""
+        self.V_refmain_addr = ""
+
+        self.V_reset = 0x00
+        self.D_sub = 0x00
+        self.V_biasgate = 0x00
+        self.V_refmain = 0x00
 
         self.samplingMode = UTR_MODE
 
@@ -495,6 +504,21 @@ class DC(threading.Thread):
 
                 msg = "%s %s %s %s %s" % (CMD_ASICLOAD, _read[0], _read[1], _read[2], _read[3])
                 self.publish_to_local_queue(msg)
+
+                # --------------------------------------------
+                # for saving in header list
+                self.V_reset_addr = param[1]
+                self.V_reset = hex(int(_read[0]))
+
+                self.D_sub_addr = param[3]
+                self.D_sub = hex(int(_read[1]))
+
+                self.V_biasgate_addr = param[5]
+                self.V_biasgate = hex(int(_read[2]))
+
+                self.V_refmain_addr = param[7]
+                self.V_refmain = hex(int(_read[3]))
+                # --------------------------------------------
 
             elif param[0] == CMD_WRITEASICREG:
                 res = self.write_ASIC_reg(int(param[1]), int(param[2]))
@@ -1210,6 +1234,8 @@ class DC(threading.Thread):
 
         else:
             getByte = FRAME_X * FRAME_Y * 2 * 2 * self.reads * self.ramps
+            #frame_1 = FRAME_X * FRAME_Y * 2
+            #getByte = frame_1 * self.reads * self.ramps * self.groups + frame_1 * 2
             triggerTimeout = triggerTimeout + ((T_frame * self.resets) + self.fowlerTime + (2 * T_frame * self.reads)) * self.ramps * 1000 #100000
             msg = "triggerTimeout 2: %.3f %.3f" % (self.fowlerTime, triggerTimeout)
             self.log.send(self._iam, DEBUG, msg)
@@ -1591,6 +1617,18 @@ class DC(threading.Thread):
 
         val = "0x%04x" % self.preampInputVal
         pHeaders[header_cnt] = MACIE_FitsHdr(key="AMPINPUT".encode(), valType=HDR_STR, sVal=val.encode(), comment="Preamp input".encode())
+        header_cnt += 1
+
+        pHeaders[header_cnt] = MACIE_FitsHdr(key="VRESET".encode(), valType=HDR_STR, sVal=self.V_reset.encode(), comment="V reset".encode())
+        header_cnt += 1
+
+        pHeaders[header_cnt] = MACIE_FitsHdr(key="DSUB".encode(), valType=HDR_STR, sVal=self.D_sub.encode(), comment="D sub".encode())
+        header_cnt += 1
+
+        pHeaders[header_cnt] = MACIE_FitsHdr(key="VBIASGAT".encode(), valType=HDR_STR, sVal=self.V_biasgate.encode(), comment="V BiasGate".encode())
+        header_cnt += 1
+
+        pHeaders[header_cnt] = MACIE_FitsHdr(key="VREFMAIN".encode(), valType=HDR_STR, sVal=self.V_refmain.encode(), comment="V Ref.Main".encode())
         header_cnt += 1
 
         #-------------------------------------------------------------------------------------

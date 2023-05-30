@@ -160,11 +160,11 @@ class MainWindow(Ui_Dialog, QMainWindow):
 
         self.log.send(self._iam, INFO, "DCS gui closed!")
 
-        self.consumer.channel.close()
-        self.producer.channel.close()
+        #self.consumer.channel.close()
+        #self.producer.channel.close()
         
-        #if self.producer != None:
-        #    self.producer.__del__()
+        if self.producer != None:
+            self.producer.__del__()
 
         return super().closeEvent(event)
 
@@ -292,11 +292,11 @@ class MainWindow(Ui_Dialog, QMainWindow):
 
             if self.chk_autosave.isChecked():
                 file = param[2].split("/")
-                path = ""
-                for i in file[1:-1]:
-                    path += "/"
-                    path += i
-                self.e_user_dir.setText(path)
+                #path = ""
+                #for i in file[1:-1]:
+                #    path += "/"
+                #    path += i
+                #self.e_user_dir.setText(path)
                 self.e_user_file.setText(file[-1][:-5] + "_")
                        
 
@@ -373,7 +373,6 @@ class MainWindow(Ui_Dialog, QMainWindow):
             self.e_fowler_number.setText(str(reads))
 
             if self.samplingMode == FOWLER_MODE:
-                
                 self.e_exp_time.setEnabled(True)
                 self.e_fowler_number.setEnabled(False)
                 self.radio_exp_time.show()

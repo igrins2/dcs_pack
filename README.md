@@ -2,7 +2,7 @@
 
 1. Download `dcs_pack` directory from GitHub
 
-2. Unzip the compressed file `../dcs_pack/installation/macie_v5.2_centos.tar.gz` in the same folder
+2. Unzip the compressed file `../dcs_pack/installation/macie_v5.3_centos.tar.gz` in the same folder
 
 3. Open and edit 
 	- In "../dcs_pack/installation/dc-core.service"

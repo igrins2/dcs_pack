@@ -5,8 +5,8 @@ firewall-cmd --zone=trusted --change-interface=eno1
 
 HOME=/home/dcss
 
-export LD_LIBRARY_PATH=$HOME/macie_v5.2_centos/MacieApp/
-export PATH=$PATH:$HOME/macie_v5.2_centos/MacieApp/
+export LD_LIBRARY_PATH=$HOME/macie_v5.3_centos/MacieApp/
+export PATH=$PATH:$HOME/macie_v5.3_centos/MacieApp/
 
 PYTHONBIN=$HOME/miniconda3/envs/dcs/bin/python
 

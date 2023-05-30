@@ -13,17 +13,17 @@ cp $HOME/dcs_pack/installation/DCS.ini $HOME/DCS
 
 
 # set macie library
-cp -r $HOME/dcs_pack/installation/macie_v5.2_centos $HOME/macie_v5.2_centos
+cp -r $HOME/dcs_pack/installation/macie_v5.3_centos $HOME/macie_v5.3_centos
 
-sudo cp $HOME/dcs_pack/installation/macie_v5.2_centos/MacieApp/libMACIE.so /lib
-sudo cp $HOME/dcs_pack/installation/macie_v5.2_centos/MacieApp/51-ftd3xx.rules /etc/udev/rules.d
+sudo cp $HOME/dcs_pack/installation/macie_v5.3_centos/MacieApp/libMACIE.so /lib
+sudo cp $HOME/dcs_pack/installation/macie_v5.3_centos/MacieApp/51-ftd3xx.rules /etc/udev/rules.d
 sudo udevadm control --reload-rules
 
 sudo sysctl -w net.core.rmem_max="134000000"
 sudo firewall-cmd --zone=trusted --change-interface=eno1
 
-export LD_LIBRARY_PATH=$HOME/macie_v5.2_centos/MacieApp/
-export PATH=$PATH:$HOME/macie_v5.2_centos/MacieApp/
+export LD_LIBRARY_PATH=$HOME/macie_v5.3_centos/MacieApp/
+export PATH=$PATH:$HOME/macie_v5.3_centos/MacieApp/
 
 
 # install python library
