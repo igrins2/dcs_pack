@@ -181,6 +181,7 @@ class DC(threading.Thread):
         self.dewar_info = False
 
         self.param = ""
+        self.temp_number = 1    #for simulation mode
 
         ti.sleep(10)
 
@@ -322,13 +323,15 @@ class DC(threading.Thread):
 
                 _t = datetime.datetime.utcnow()
                 cur_datetime = [_t.year, _t.month, _t.day, _t.hour, _t.minute, _t.second, _t.microsecond]
-                folder_name = "%04d%02d%02d_%02d%02d%02d" % (cur_datetime[0], cur_datetime[1], cur_datetime[2], cur_datetime[3], cur_datetime[4], cur_datetime[5])
+                folder_name = "SDC%s_%04d%02d%02d_%d" % (IAM[-1], cur_datetime[0], cur_datetime[1], cur_datetime[2], self.temp_number)
 
                 msg = "%s 5 %s" % (param[0], folder_name)
                 self.publish_to_ics_queue(msg)
             
                 msg = "%s ->" % msg
                 self.log.send(IAM, INFO, msg)
+                
+                self.temp_number += 1
 
             elif param[0] == CMD_STOPACQUISITION:
                 self.publish_to_ics_queue(param[0])
