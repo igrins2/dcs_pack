@@ -8,8 +8,8 @@ elif [[ ! -d $HOME/DCS ]]; then
 fi
 
 
-# configuration file
-cp $HOME/dcs_pack/installation/DCS.ini $HOME/DCS
+# set DCS directory including configuration file
+cp -r $HOME/dcs_pack/installation/DCS $HOME
 
 
 # set macie library
@@ -20,7 +20,7 @@ sudo cp $HOME/dcs_pack/installation/macie_v5.3_centos/MacieApp/51-ftd3xx.rules /
 sudo udevadm control --reload-rules
 
 sudo sysctl -w net.core.rmem_max="134000000"
-sudo firewall-cmd --zone=trusted --change-interface=eno1
+sudo firewall-cmd --zone=trusted --change-interface=ens160
 
 export LD_LIBRARY_PATH=$HOME/macie_v5.3_centos/MacieApp/
 export PATH=$PATH:$HOME/macie_v5.3_centos/MacieApp/
@@ -38,13 +38,13 @@ conda activate dcs
 
 pip install numpy
 pip install astropy
-pip install pyside6
+pip install pyside6==6.4.2
 pip install pyqt5
 pip install pika
 
 
 # ds9
-cp $HOME/dcs_pack/installation/ds9 $HOME/DCS/
+#cp $HOME/dcs_pack/installation/ds9 $HOME/DCS/
 
 
 # make Folwer Sampling library

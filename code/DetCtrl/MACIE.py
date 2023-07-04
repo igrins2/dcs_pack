@@ -29,7 +29,7 @@ HDR_STR = 2
 #need to check!!!
 MACIE_ERROR_COUNTERS = 33
 
-lib = CDLL(WORKING_DIR + "macie_v5.2_centos/MacieApp/libMACIE.so")
+lib = CDLL(WORKING_DIR + "macie_v5.3_centos/MacieApp/libMACIE.so")
  
 #input, output parameters  
 lib.MACIE_LibVersion.restype = c_float  
