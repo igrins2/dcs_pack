@@ -3,7 +3,7 @@
 """
 Created on Mar 4, 2022
 
-Modified on June 27, 2023
+Modified on July 05, 2023
 
 @author: hilee
 """
@@ -148,10 +148,10 @@ class DC(threading.Thread):
         self.preampGain = 8  # 1
 
         # hardware addr
-        self.V_reset_addr = ""
-        self.D_sub_addr = ""
-        self.V_biasgate_addr = ""
-        self.V_refmain_addr = ""
+        self.V_reset_addr = hex(int(0))
+        self.D_sub_addr = hex(int(0))
+        self.V_biasgate_addr = hex(int(0))
+        self.V_refmain_addr = hex(int(0))
 
         # need to test
         self.V_reset = hex(int(0))
@@ -463,6 +463,8 @@ class DC(threading.Thread):
                     self.publish_to_local_queue(msg)
 
             elif param[0] == CMD_INITIALIZE2:
+                self.macie_file = param[3]
+                self.asic_file = param[4]
                 if self.Initialize2() == False:
                     continue
                 if self.ResetASIC() == False:
@@ -471,6 +473,8 @@ class DC(threading.Thread):
                     continue
                 if self.SetDetector(int(param[1]), int(param[2])):
                     self.publish_to_local_queue(CMD_INITIALIZE2)
+
+                self.load_ASIC()
 
             elif param[0] == CMD_RESET:
                 if self.ResetASIC():
@@ -572,6 +576,8 @@ class DC(threading.Thread):
                         continue
                     if self.SetDetector(MUX_TYPE, 32):
                         self.publish_to_ics_queue(param[0])
+
+                    self.load_ASIC()
 
             elif param[0] == CMD_SETFSPARAM_ICS:
                 self.samplingMode = FOWLER_MODE
@@ -690,9 +696,9 @@ class DC(threading.Thread):
                 res = RET_FAIL
             self.log.send(self._iam, INFO, "MACIE_CheckInterfaces: " + res)
 
-            if self.pCard == None or res == RET_FAIL:
-                self.log.send(self._iam, ERROR, RET_FAIL)
-                return None, None
+            #if self.pCard == None or res == RET_FAIL:
+            #    self.log.send(self._iam, ERROR, RET_FAIL)
+            #    return None, None
                 
             macieSN = self.pCard[self.slctCard].contents.macieSerialNumber
             self.log.send(self._iam, INFO, str(macieSN))
@@ -705,11 +711,10 @@ class DC(threading.Thread):
             self.log.send(self._iam, INFO, str(self.pCard[self.slctCard].contents.serialPortName.decode()))
             self.log.send(self._iam, INFO, str(self.pCard[self.slctCard].contents.firmwareSlot1.decode()))
 
-            #if self.ip_addr == ipaddr:
-
             return ipaddr, macieSN
 
         except:
+            #pass
             return None, None
 
 
@@ -861,15 +866,21 @@ class DC(threading.Thread):
 
     def load_ASIC(self):
         reg = ["6000", "6002", "6004", "602c"]
+        _addr = [0 for _ in range(4)]
         _read = [0 for _ in range(4)]
         for idx in range(4):
-            _addr = int("0x" + reg[idx], 16)
-            val, sts = self.read_ASIC_reg(_addr)
+            _addr[idx] = int("0x" + reg[idx], 16)
+            val, sts = self.read_ASIC_reg(_addr[idx])
             if sts == MACIE_OK:
-                _read[idx] = val[0]                          
+                _read[idx] = val[0]                       
 
         # --------------------------------------------
         # for saving in header list
+        self.V_reset_addr = reg[0]
+        self.D_sub_addr = reg[1]
+        self.V_biasgate_addr = reg[2]
+        self.V_refmain_addr = reg[3]
+
         self.V_reset = hex(int(_read[0]))
         self.D_sub = hex(int(_read[1]))
         self.V_biasgate = hex(int(_read[2]))
@@ -1344,8 +1355,6 @@ class DC(threading.Thread):
             if data == None:
                 self.log.send(self._iam, WARNING, "Null frame")
                 return None  
-            
-            return data
            
         except:
             pass
@@ -1357,6 +1366,8 @@ class DC(threading.Thread):
         elif byte < getByte:
             self.log.send(self._iam, WARNING, "Trigger timeout: no available science data")
             return None
+
+        return data
                     
 
     def createFolder(self, dir):
@@ -1401,6 +1412,8 @@ class DC(threading.Thread):
         else:
             self.next_idx = 1
         '''
+        if self.next_idx == 0:
+            self.next_idx = 1
         
         cur_dir = today_dir + str(self.next_idx) + "/"
         self.createFolder(cur_dir)
@@ -1651,20 +1664,20 @@ class DC(threading.Thread):
         pHeaders[header_cnt] = MACIE_FitsHdr(key="AMPINPUT".encode(), valType=HDR_STR, sVal=val.encode(), comment="Preamp input".encode())
         header_cnt += 1
 
-        _cmt = "V reset (%s)" % self.V_reset_addr
-        pHeaders[header_cnt] = MACIE_FitsHdr(key="VRESET".encode(), valType=HDR_STR, sVal=self.V_reset.encode(), comment=_cmt)
+        _cmt = "V reset (0x%s)" % self.V_reset_addr
+        pHeaders[header_cnt] = MACIE_FitsHdr(key="VRESET".encode(), valType=HDR_STR, sVal=self.V_reset.encode(), comment=_cmt.encode())
         header_cnt += 1
 
-        _cmt = "D sub (%s)" % self.D_sub_addr
-        pHeaders[header_cnt] = MACIE_FitsHdr(key="DSUB".encode(), valType=HDR_STR, sVal=self.D_sub.encode(), comment=_cmt)
+        _cmt = "D sub (0x%s)" % self.D_sub_addr
+        pHeaders[header_cnt] = MACIE_FitsHdr(key="DSUB".encode(), valType=HDR_STR, sVal=self.D_sub.encode(), comment=_cmt.encode())
         header_cnt += 1
 
-        _cmt = "V BiasGate (%s)" % self.V_biasgate_addr
-        pHeaders[header_cnt] = MACIE_FitsHdr(key="VBIASGAT".encode(), valType=HDR_STR, sVal=self.V_biasgate.encode(), comment=_cmt)
+        _cmt = "V BiasGate (0x%s)" % self.V_biasgate_addr
+        pHeaders[header_cnt] = MACIE_FitsHdr(key="VBIASGAT".encode(), valType=HDR_STR, sVal=self.V_biasgate.encode(), comment=_cmt.encode())
         header_cnt += 1
 
-        _cmt = "V Ref.Main (%s)" % self.V_refmain_addr
-        pHeaders[header_cnt] = MACIE_FitsHdr(key="VREFMAIN".encode(), valType=HDR_STR, sVal=self.V_refmain.encode(), comment=_cmt)
+        _cmt = "V Ref.Main (0x%s)" % self.V_refmain_addr
+        pHeaders[header_cnt] = MACIE_FitsHdr(key="VREFMAIN".encode(), valType=HDR_STR, sVal=self.V_refmain.encode(), comment=_cmt.encode())
         header_cnt += 1
 
         #-------------------------------------------------------------------------------------

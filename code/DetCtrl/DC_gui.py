@@ -492,7 +492,7 @@ class MainWindow(Ui_Dialog, QMainWindow):
 
         self.QWidgetBtnColor(self.btn_initialize2, "yellow", "blue")
 
-        msg = "%s %d %s" % (CMD_INITIALIZE2, MUX_TYPE, self.cmb_ouput_channels.currentText())
+        msg = "%s %d %s %s %s" % (CMD_INITIALIZE2, MUX_TYPE, self.cmb_ouput_channels.currentText(), self.macie_file, self.asic_file)
         self.publish_to_queue(msg)
 
 
@@ -830,12 +830,14 @@ class MainWindow(Ui_Dialog, QMainWindow):
                 if path[0]:
                     file = path[0].split('/')
                     self.e_MACIE_reg.setText(file[-1])
+                    self.macie_file = file[-1]
             
             elif find_option == ASIC_FILE:
                 path = QFileDialog.getOpenFileName(self, "Choose File", folder, filter='*.mcd')
                 if path[0]:
                     file = path[0].split('/')
                     self.e_ASIC_firmware.setText(file[-1])
+                    self.asic_file = file[-1]
 
     
     def asic_load(self):        
