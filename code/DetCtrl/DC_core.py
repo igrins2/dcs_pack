@@ -3,7 +3,7 @@
 """
 Created on Mar 4, 2022
 
-Modified on July 05, 2023
+Modified on May 30, 2023
 
 @author: hilee
 """
@@ -168,7 +168,7 @@ class DC(threading.Thread):
         self.loadimg = []
 
         self.measured_startT = 0
-        
+
         self.next_idx = 0
         
 
@@ -1072,6 +1072,7 @@ class DC(threading.Thread):
 
 
     def AcquireRamp(self):
+
         if self.handle == 0:
             return False
 
@@ -1156,7 +1157,7 @@ class DC(threading.Thread):
     def AcquireRamp_window(self):
         if self.handle == 0:
             return False
-        
+
         self.stop = False
 
         self.measured_startT = ti.time()
@@ -1170,6 +1171,7 @@ class DC(threading.Thread):
         res[1] = lib.MACIE_WriteASICReg(self.handle, self.slctASICs, ASICAddr_PreAmpReg1Ch1ENAddr, self.preampInputVal, self.option)
         res[2] = lib.MACIE_WriteASICReg(self.handle, self.slctASICs, ASICAddr_ASICPreAmpGainVal, self.preampGain, self.option)
         res[3] = lib.MACIE_WriteASICReg(self.handle, self.slctASICs, ASICAddr_NReads, 1, self.option)
+
         
         res[4] = lib.MACIE_WriteASICReg(self.handle, self.slctASICs, ASICAddr_HxRGExpModeVal, 2, self.option)  # UTR, window
         arr_list = [self.x_start, self.x_stop, self.y_start, self.y_stop] # x1, x2, y1, y2
@@ -1256,24 +1258,60 @@ class DC(threading.Thread):
         # Wait for available science data bytes
         idleReset, moreDelay = 1, 2000
         triggerTimeout = (T_frame * 1000) * (self.resets + idleReset) + moreDelay  # delay time for one frame
-        msg = "triggerTimeout 1: %.3f" % triggerTimeout
+        msg = "triggerTimeout: %.3f" % triggerTimeout
         self.log.send(self._iam, DEBUG, msg)
 
-        ti.sleep(1.5)
-        
-        getByte = FRAME_X * FRAME_Y * 2
-        triggerTimeout = triggerTimeout + ((T_frame * self.resets) + T_frame) * 1000
-        msg = "triggerTimeout 2: %.3f" % triggerTimeout
-        self.log.send(self._iam, DEBUG, msg)
-        
-        self.loadimg = []
-        cur_dir = self.set_fits_path()
-        if not self.read_write_Fits_sub(getByte, triggerTimeout, cur_dir):
+        frame_cnt, current_cnt = 0, 0
+        if self.samplingMode == UTR_MODE:
+            frame_cnt = self.reads * self.ramps
+        else:
+            frame_cnt = self.reads * self.ramps * 2
+
+        while current_cnt < frame_cnt:
+            byte = 0
+            for i in range(100):
+                if self.stop:
+                    break
+
+                byte = lib.MACIE_AvailableScienceData(self.handle)
+                if byte > 0:
+                    msg = "Available science data = %d bytes, Loop = %d" % (
+                        byte, i)
+                    self.log.send(self._iam, INFO, msg)
+                    break
+                log = "Wait....(%d), stop(%d)" % (i, self.stop)
+                self.log.send(self._iam, INFO, log)
+                ti.sleep(triggerTimeout / 100 / 1000)
+
+            if self.stop:
+                self.log.send(self._iam, INFO, "Stop: Image Acquiring")
+                break
+
+            if byte <= 0:
+                self.log.send(self._iam, WARNING, "Trigger timeout: no available science data")
+                break
+
+            #data = None
+            arr_list = []
+            arr = np.array(arr_list)
+            data = arr.ctypes.data_as(POINTER(c_ushort))
+            
+            data = lib.MACIE_ReadGigeScienceFrame(self.handle, int(1500 + 5000))
+            if data == None:
+                self.log.send(self._iam, WARNING, "Null frame")
+                break
+                
+            start = FRAME_X * FRAME_Y
+            self.loadimg.append(data[start*current_cnt:start*(current_cnt+1)])
+
+            current_cnt += 1
+
+        lib.MACIE_CloseGigeScienceInterface(self.handle, self.slctMACIEs)
+
+        if current_cnt != frame_cnt:
             return False
         
-        lib.MACIE_CloseGigeScienceInterface(self.handle, self.slctMACIEs)            
-
-        self.folder_name, self.full_path = self.write_Fits(cur_dir)
+        self.folder_name, self.full_path = self.WriteFitsFile()
 
         return True
 
@@ -1317,58 +1355,19 @@ class DC(threading.Thread):
         data = arr.ctypes.data_as(POINTER(c_ushort))
         
         data = lib.MACIE_ReadGigeScienceFrame(self.handle, int(1500 + 5000))
+
         if data == None:
             self.log.send(self._iam, WARNING, "Null frame (ROI)")
             return False
 
+        self.loadimg = data
+
         lib.MACIE_CloseGigeScienceInterface(self.handle, self.slctMACIEs)
 
-        self.full_path = self.write_Fits_window(data)
+        self.folder_name = self.WriteFitsFile_window()
 
         return True
-    
-    
-    def available_sci_data(self, getByte, triggerTimeout):
-        byte = 0
-        try:
-            for i in range(int(triggerTimeout / 1000 * 2)):
-                if self.stop:
-                    break
 
-                byte = lib.MACIE_AvailableScienceData(self.handle)
-                if byte >= getByte:
-                    msg = "Available science data = %d bytes, Loop = %d" % (
-                        byte, i)
-                    self.log.send(self._iam, INFO, msg)
-                    break
-                log = "Wait....(%d), stop(%d)" % (i, self.stop)
-                self.log.send(self._iam, INFO, log)
-                #ti.sleep(triggerTimeout / 100 / 1000)
-                ti.sleep(1)   
-                
-            #data = None
-            arr_list = []
-            arr = np.array(arr_list)
-            data = arr.ctypes.data_as(POINTER(c_ushort))
-            
-            data = lib.MACIE_ReadGigeScienceFrame(self.handle, int(1500 + 5000))
-            if data == None:
-                self.log.send(self._iam, WARNING, "Null frame")
-                return None  
-           
-        except:
-            pass
-        
-        if self.stop:
-            self.log.send(self._iam, INFO, "Stop: Image Acquiring")
-            return None
-            
-        elif byte < getByte:
-            self.log.send(self._iam, WARNING, "Trigger timeout: no available science data")
-            return None
-
-        return data
-                    
 
     def createFolder(self, dir):
         try:
@@ -1378,10 +1377,13 @@ class DC(threading.Thread):
             self.log.send(self._iam, WARNING, "Error: Creating directory. " + dir)
 
 
-    def set_fits_path(self):
+        
+    def WriteFitsFile(self, local = True):
+        self.log.send(self._iam, INFO, "Write Fits file now....")
+
         _t = datetime.datetime.utcnow()
 
-        self.cur_datetime = [_t.year, _t.month, _t.day, _t.hour, _t.minute, _t.second, _t.microsecond]
+        cur_datetime = [_t.year, _t.month, _t.day, _t.hour, _t.minute, _t.second, _t.microsecond]
 
         path = "%s/Data/" % self.exe_path
         self.createFolder(path)
@@ -1397,117 +1399,100 @@ class DC(threading.Thread):
         self.createFolder(path)
 
         #folder_name = "%04d%02d%02d_%02d%02d%02d" % (cur_datetime[0], cur_datetime[1], cur_datetime[2], cur_datetime[3], cur_datetime[4], cur_datetime[5])
-        cur_date = "%04d%02d%02d" % (self.cur_datetime[0], self.cur_datetime[1], self.cur_datetime[2])
-        today_dir = path + cur_date + "/"
-        self.createFolder(today_dir)
+        folder_name = "%04d%02d%02d" % (cur_datetime[0], cur_datetime[1], cur_datetime[2])
+        path += folder_name + "/"
+        self.createFolder(path)
 
         '''
         dir_names = []
-        for names in os.listdir(today_dir):
+        for names in os.listdir(path):
             if names.find(".fits") < 0:
                 dir_names.append(names)
         numbers = list(map(int, dir_names))
         if len(numbers) > 0:
-            self.next_idx = max(numbers) + 1
+            next_idx = max(numbers) + 1
         else:
-            self.next_idx = 1
+            next_idx = 1
         '''
         if self.next_idx == 0:
             self.next_idx = 1
+        path2 = path + str(self.next_idx) + "/"
+        self.createFolder(path2)
         
-        cur_dir = today_dir + str(self.next_idx) + "/"
-        self.createFolder(cur_dir)
-        
-        return cur_dir
-        
-
-    def read_write_Fits_sub(self, getByte, triggerTimeout, cur_dir):
-        self.log.send(self._iam, INFO, "Write Fits file now....")
-        
+        idx = 0
         #------------------------------------------------------------------------
         if self.samplingMode == UTR_MODE:  # single mode
             for ramp in range(self.ramps):
                 for group in range(self.groups):
                     for read in range(self.reads):
-                        loadimg = self.available_sci_data(getByte, triggerTimeout)
-                        if loadimg != None:
-                            filename = "%sH2RG_R%02d_M%02d_N%02d.fits" % (cur_dir, ramp+1, group+1, read+1)
-                            sts = self.save_fitsfile_sub(loadimg, filename, self.cur_datetime, ramp+1, group+1, read+1)
 
-                        if loadimg == None or sts != MACIE_OK:
+                        filename = "%sH2RG_R%02d_M%02d_N%02d.fits" % (path2, ramp + 1, group+1, read + 1)
+                        sts = self.save_fitsfile_sub(idx, filename, cur_datetime, ramp+1, group+1, read+1)
+
+                        if sts != MACIE_OK:
                             self.log.send(self._iam, ERROR, self.GetErrMsg())
-                            return False
+                            return -1
                         else:
                             self.log.send(self._iam, INFO, filename)
-                            
-                        self.loadimg.append(loadimg)
-                        
-            self.measured_durationT = ti.time() - self.measured_startT
 
-            self.full_path = filename
+                        idx += 1
+
+            self.measured_durationT = ti.time() - self.measured_startT
+            
+            '''
+            if local and self.showfits and self.ramps == 1 and self.groups == 1 and self.reads == 1:
+                ds9 = WORKING_DIR + 'DCS/ds9'
+                #subprocess.run([ds9, '-b', filename, '-o', 'newfile'], shell = True)
+                subprocess.Popen(['sudo', ds9, filename])
+                self.log.send(self._iam, INFO, ds9)
+            '''
+
+            return '', filename
 
         elif self.samplingMode == CDS_MODE:  # ramp=1, group=1, read=1
             for read in range(self.reads*2):
-                loadimg = self.available_sci_data(getByte, triggerTimeout)
-                if loadimg != None:
-                    filename = "%sH2RG_R01_M01_N%02d.fits" % (cur_dir, read+1)
-                    sts = self.save_fitsfile_sub(loadimg, filename, self.cur_datetime, 1, 1, read+1)
+                filename = "%sH2RG_R01_M01_N%02d.fits" % (path2, read + 1)
+                sts = self.save_fitsfile_sub(idx, filename, cur_datetime, 1, 1, read+1)
 
-                if loadimg == None or sts != MACIE_OK:
+                if sts != MACIE_OK:
                     self.log.send(self._iam, ERROR, self.GetErrMsg())
-                    return False
+                    return -1
                 else:
                     self.log.send(self._iam, INFO, filename)
-                    
-                self.loadimg.append(loadimg)
+
+                idx += 1
 
         elif self.samplingMode == CDSNOISE_MODE:  # ramp=2, group=1, read=1
             for ramp in range(self.ramps):
                 for read in range(self.reads*2):
-                    loadimg = self.available_sci_data(getByte, triggerTimeout)
-                    if loadimg != None:
-                        filename = "%sH2RG_R%02d_M01_N%02d.fits" % (cur_dir, ramp+1, read+1)
-                        sts = self.save_fitsfile_sub(loadimg, filename, self.cur_datetime, ramp+1, 1, read+1)
+                    filename = "%sH2RG_R%02d_M01_N%02d.fits" % (path2, ramp + 1, read + 1)
+                    sts = self.save_fitsfile_sub(idx, filename, cur_datetime, ramp + 1, 1, read+1)
 
-                    if loadimg == None or sts != MACIE_OK:
+                    if sts != MACIE_OK:
                         self.log.send(self._iam, ERROR, self.GetErrMsg())
-                        return False
+                        return -1
                     else:
                         self.log.send(self._iam, INFO, filename)
-                        
-                    self.loadimg.append(loadimg)
+
+                    idx += 1
 
         elif self.samplingMode == FOWLER_MODE:  # ramp=1, group=1, read=1,2,4,8,16
             for group in range(2):
                 for read in range(self.reads):
-                    loadimg = self.available_sci_data(getByte, triggerTimeout)
-                    if loadimg != None:
-                        filename = "%sH2RG_R01_M%02d_N%02d.fits" % (cur_dir, group+1, read+1)
-                        sts = self.save_fitsfile_sub(loadimg, filename, self.cur_datetime, 1, group+1, read+1)
+                    filename = "%sH2RG_R01_M%02d_N%02d.fits" % (path2, group+1, read + 1)
+                    sts = self.save_fitsfile_sub(idx, filename, cur_datetime, 1, group+1, read+1)
 
-                    if loadimg == None or sts != MACIE_OK:
+                    if sts != MACIE_OK:
                         self.log.send(self._iam, ERROR, self.GetErrMsg())
-                        return False
+                        return -1
                     else:
                         self.log.send(self._iam, INFO, filename)
-                        
-                    self.loadimg.append(loadimg)
-    
-        return True
-    
-        
-    def write_Fits(self, cur_dir):
-        cur_date = "%04d%02d%02d" % (self.cur_datetime[0], self.cur_datetime[1], self.cur_datetime[2])
-        path = "%s/Data/%s/" % (self.exe_path, cur_date)
-        
-        startime = ti.time()
-        
-        frmcnt = 0
-        if self.samplingMode == UTR_MODE:
-            frmcnt = self.reads * self.groups * self.ramps
-        else:
-            frmcnt = 2 * self.reads * self.ramps                
 
+                    idx += 1
+    
+        startime = ti.time()
+
+        #-----------------------------------------------------------------------
         arr = np.array(self.loadimg, dtype=np.int16)
         data = arr.ctypes.data_as(POINTER(c_ushort))
 
@@ -1515,13 +1500,13 @@ class DC(threading.Thread):
         arr = np.array(arr_list, dtype=np.float32)
         res = arr.ctypes.data_as(POINTER(c_float))
 
-        res = fowler_calculation(self.samplingMode, self.reads, frmcnt, data)
+        res = fowler_calculation(self.samplingMode, self.reads, idx, data)
 
         filename = ""
         if self.samplingMode == CDS_MODE:
-            lastfilename = "%sH2RG_R01_M01_N02.fits" % cur_dir
+            lastfilename = "%sH2RG_R01_M01_N02.fits" % path2
             #filename = "CDSResult.fits"
-            filename = "SDC%s_%s_%04d.fits" % (IAM[-1], cur_date, self.next_idx)
+            filename = "SDC%s_%s_%04d.fits" % (IAM[-1], folder_name, self.next_idx)
             self.save_fitsfile_final(lastfilename, path, filename, self.reads, res)
         
         elif self.samplingMode == CDSNOISE_MODE:
@@ -1530,22 +1515,22 @@ class DC(threading.Thread):
                 start = FRAME_X * FRAME_Y
                 reslist.append(res[start*i:start*(i+1)])
 
-                lastfilename = "%sH2RG_R02_M01_N02.fits" % cur_dir
+                lastfilename = "%sH2RG_R02_M01_N02.fits" % path2
                 if i < 2:
                     #filename = "CDSResult%d.fits" % (i+1)
-                    filename = "SDC%s_%s_%04d(%d).fits" % (IAM[-1], cur_date, self.next_idx, i+1)
+                    filename = "SDC%s_%s_%04d(%d).fits" % (IAM[-1], folder_name, self.next_idx, i+1)
                 else:
                     #filename = "CDSNoise.fits"
-                    filename = "SDC%s_%s_%04d.fits" % (IAM[-1], cur_date, self.next_idx)
+                    filename = "SDC%s_%s_%04d.fits" % (IAM[-1], folder_name, self.next_idx)
 
                 self.save_fitsfile_final(lastfilename, path, filename, self.reads, reslist[i])
 
 
         elif self.samplingMode == FOWLER_MODE:
-            lastfilename = "%sH2RG_R01_M02_N%02d.fits" % (cur_dir, self.reads)
+            lastfilename = "%sH2RG_R01_M02_N%02d.fits" % (path2, self.reads)
             #filename = "FowlerResult.fits"
-            #filename = "SDC%s_%s.fits" % (IAM[-1], self.cur_date)
-            filename = "SDC%s_%s_%04d.fits" % (IAM[-1], cur_date, self.next_idx)
+            #filename = "SDC%s_%s.fits" % (IAM[-1], folder_name)
+            filename = "SDC%s_%s_%04d.fits" % (IAM[-1], folder_name, self.next_idx)
             
             self.save_fitsfile_final(lastfilename, path, filename, self.reads, res)
 
@@ -1557,15 +1542,15 @@ class DC(threading.Thread):
         
         self.measured_durationT = ti.time() - self.measured_startT
 
-        return cur_date + "/" + filename, path + "/" + filename
+        return folder_name + "/" + filename, path + "/" + filename
 
     
-    def write_Fits_window(self, data):
+    def WriteFitsFile_window(self):
         self.log.send(self._iam, INFO, "Write Fits file now (ROI)....")
     
         _t = datetime.datetime.utcnow()
 
-        self.cur_datetime = [_t.year, _t.month, _t.day, _t.hour, _t.minute, _t.second, _t.microsecond]
+        cur_datetime = [_t.year, _t.month, _t.day, _t.hour, _t.minute, _t.second, _t.microsecond]
 
         path = "%s/Data/" % self.exe_path
         self.createFolder(path)
@@ -1574,38 +1559,24 @@ class DC(threading.Thread):
         self.createFolder(path)
 
         #str = time.strftime("%Y%m%d_%H%M%S", time.localtime(time.time()))
-        cur_date = "%04d%02d%02d" % (self.cur_datetime[0], self.cur_datetime[1], self.cur_datetime[2])
-        today_dir = path + cur_date + "/"
-        self.createFolder(today_dir)
-        
-        dir_names = []
-        for names in os.listdir(today_dir):
-            if names.find(".fits") < 0:
-                dir_names.append(names)
-        numbers = list(map(int, dir_names))
-        if len(numbers) > 0:
-            self.next_idx = max(numbers) + 1
-        else:
-            self.next_idx = 1
-        cur_dir = today_dir + str(self.next_idx) + "/"
-        self.createFolder(cur_dir)
+        folder_name = "%04d%02d%02d_%02d%02d%02d" % (cur_datetime[0], cur_datetime[1], cur_datetime[2], cur_datetime[3], cur_datetime[4], cur_datetime[5])
+        path += folder_name + "/"
+        self.createFolder(path)
 
-        filename = "%sH2RG_R01_M01_N01.fits" % cur_dir
-        sts = self.save_fitsfile_sub(data, filename, self.cur_datetime, 1, 1, 1)
+        filename = "%sH2RG_R01_M01_N01.fits" % path
+        sts = self.save_fitsfile_sub(0, filename, cur_datetime, 1, 1, 1)
 
         if sts != MACIE_OK:
             self.log.send(self._iam, ERROR, self.GetErrMsg())
             return -1
         else:
             self.log.send(self._iam, INFO, filename)
-            
-        self.measured_durationT = ti.time() - self.measured_startT
 
-        return filename
+        return folder_name
             
 
 
-    def save_fitsfile_sub(self, data, filename, cur_datetime, ramp, group, read):
+    def save_fitsfile_sub(self, idx, filename, cur_datetime, ramp, group, read):
         
         header_array = MACIE_FitsHdr * FITS_HDR_CNT
         pHeaders = header_array()
@@ -1847,11 +1818,13 @@ class DC(threading.Thread):
         pHeaders[header_cnt] = MACIE_FitsHdr(key="SEQNNAME".encode(), valType=HDR_STR, sVal=str.encode(), comment="Ramp and Group String".encode())
         header_cnt += 1
 
-        arr = np.array(data, dtype=np.int16)
-        data = arr.ctypes.data_as(POINTER(c_ushort))
-        if self.ROIMode:            
+        if self.ROIMode:
+            arr = np.array(self.loadimg, dtype=np.int16)
+            data = arr.ctypes.data_as(POINTER(c_ushort))
             sts = lib.MACIE_WriteFitsFile(c_char_p(filename.encode()), self.x_stop - self.x_start + 1, self.y_stop - self.y_start + 1, data, header_cnt, pHeaders)
         else:
+            arr = np.array(self.loadimg[idx], dtype=np.int16)
+            data = arr.ctypes.data_as(POINTER(c_ushort))
             sts = lib.MACIE_WriteFitsFile(c_char_p(filename.encode()), FRAME_X, FRAME_Y, data, header_cnt, pHeaders)
         
         # for tunning test
