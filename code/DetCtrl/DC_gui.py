@@ -464,6 +464,7 @@ class MainWindow(Ui_Dialog, QMainWindow):
                 self.e_y_stop.setEnabled(True)
         else:
             self.chk_ROI_mode.setEnabled(False)
+            self.chk_ROI_mode.setChecked(False)
 
             self.e_x_start.setEnabled(False)
             self.e_x_stop.setEnabled(False)

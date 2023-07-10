@@ -415,8 +415,8 @@ class DC(threading.Thread):
         param = self.param.split()
         if param[0] == CMD_VERSION:
             if self.init1:
-                #msg = "%s %s %d 1" % (CMD_VERSION, self.LibVersion(), self.pCard[self.slctCard].contents.macieSerialNumber)
-                msg = "%s %s %d 1" % (CMD_VERSION, self.LibVersion(), self.macieSN)
+                msg = "%s %s %d 1" % (CMD_VERSION, self.LibVersion(), self.pCard[self.slctCard].contents.macieSerialNumber)
+                #msg = "%s %s %d 1" % (CMD_VERSION, self.LibVersion(), self.macieSN)
             else:
                 msg = "%s %s --- 0" % (CMD_VERSION, self.LibVersion())
 
@@ -458,8 +458,8 @@ class DC(threading.Thread):
             
             if param[0] == CMD_INITIALIZE1:  
                 if self.Initialize(int(param[1])):
-                    #msg = "%s %s %d" % (CMD_INITIALIZE1, self.LibVersion(), self.pCard[self.slctCard].contents.macieSerialNumber)
-                    msg = "%s %s %d" % (CMD_INITIALIZE1, self.LibVersion(), self.macieSN)
+                    msg = "%s %s %d" % (CMD_INITIALIZE1, self.LibVersion(), self.pCard[self.slctCard].contents.macieSerialNumber)
+                    #msg = "%s %s %d" % (CMD_INITIALIZE1, self.LibVersion(), self.macieSN)
                     self.publish_to_local_queue(msg)
 
             elif param[0] == CMD_INITIALIZE2:
@@ -489,14 +489,17 @@ class DC(threading.Thread):
                 self.SetFSParam(int(param[2]), int(param[3]), int(param[4]), float(param[5]), int(param[6]))
 
             elif param[0] == CMD_ACQUIRERAMP:
+                self.next_idx = 0
                 #print("acquire!!!!")
                 if param[1] == "0":
+                    self.ROIMode = False
                     if self.AcquireRamp() == False:
                         continue
                     if self.ImageAcquisition():
                         msg = "%s %.3f %s" % (CMD_ACQUIRERAMP, self.measured_durationT, self.full_path)
                         self.publish_to_local_queue(msg)
                 else:
+                    self.ROIMode = True
                     if self.AcquireRamp_window() == False:
                         continue
                     if self.ImageAcquisition_window():
@@ -696,9 +699,9 @@ class DC(threading.Thread):
                 res = RET_FAIL
             self.log.send(self._iam, INFO, "MACIE_CheckInterfaces: " + res)
 
-            #if self.pCard == None or res == RET_FAIL:
-            #    self.log.send(self._iam, ERROR, RET_FAIL)
-            #    return None, None
+            if self.pCard == None or res == RET_FAIL:
+                self.log.send(self._iam, ERROR, RET_FAIL)
+                return None, None
                 
             macieSN = self.pCard[self.slctCard].contents.macieSerialNumber
             self.log.send(self._iam, INFO, str(macieSN))
@@ -723,11 +726,11 @@ class DC(threading.Thread):
         #slctCard = 0
         connection = MACIE_GigE  # input by user
 
-        #self.handle = lib.MACIE_GetHandle(self.pCard[self.slctCard].contents.macieSerialNumber, connection)
-        self.handle = lib.MACIE_GetHandle(self.macieSN, connection)
+        self.handle = lib.MACIE_GetHandle(self.pCard[self.slctCard].contents.macieSerialNumber, connection)
+        #self.handle = lib.MACIE_GetHandle(self.macieSN, connection)
             
-        #msg = "(macie serial number: %d) Handle = %d" % (self.pCard[self.slctCard].contents.macieSerialNumber, self.handle)
-        msg = "(macie serial number: %d) Handle = %d" % (self.macieSN, self.handle)
+        msg = "(macie serial number: %d) Handle = %d" % (self.pCard[self.slctCard].contents.macieSerialNumber, self.handle)
+        #msg = "(macie serial number: %d) Handle = %d" % (self.macieSN, self.handle)
         self.log.send(self._iam, INFO, msg)
 
 
@@ -744,14 +747,14 @@ class DC(threading.Thread):
             return -2
         
         # 3. CheckInterfaces
-        try:
-            self.CheckInterfaces()
-        except:
-            pass
-        #_ip, _sn = self.CheckInterfaces()
-        #while _ip != self.dcs_ip_addr and _sn != self.macieSN:
-        #    ti.sleep(0.5)
-        #    _ip, _sn = self.CheckInterfaces()
+        #try:
+        #    self.CheckInterfaces()
+        #except:
+        #    pass
+        _ip, _sn = self.CheckInterfaces()
+        while _ip != self.dcs_ip_addr and _sn != self.macieSN:
+            ti.sleep(0.5)
+            _ip, _sn = self.CheckInterfaces()
 
         # 4. GetHandle
         self.GetHandle()
@@ -1165,7 +1168,7 @@ class DC(threading.Thread):
         self.log.send(self._iam, INFO, "Acquire Science Data....")
 
         # step 1. ASIC configuration
-        res = [0 for _ in range(6)]
+        res = [0 for _ in range(7)]
 
         res[0] = lib.MACIE_WriteASICReg(self.handle, self.slctASICs, ASICAddr_ASICInputRefVal, self.preampInputScheme, self.option)
         res[1] = lib.MACIE_WriteASICReg(self.handle, self.slctASICs, ASICAddr_PreAmpReg1Ch1ENAddr, self.preampInputVal, self.option)
@@ -1177,11 +1180,11 @@ class DC(threading.Thread):
         arr_list = [self.x_start, self.x_stop, self.y_start, self.y_stop] # x1, x2, y1, y2
         arr = np.array(arr_list)
         winarr = arr.ctypes.data_as(POINTER(c_uint))
-        wr = lib.MACIE_WriteASICBlock(self.handle, self.slctASICs, ASICAddr_WinArr, winarr, 4, self.option)
+        res[5] = lib.MACIE_WriteASICBlock(self.handle, self.slctASICs, ASICAddr_WinArr, winarr, 4, self.option)
 
-        res[5] = lib.MACIE_WriteASICReg(self.handle, self.slctASICs, ASICAddr_State, 0x8002, self.option)
+        res[6] = lib.MACIE_WriteASICReg(self.handle, self.slctASICs, ASICAddr_State, 0x8002, self.option)
 
-        for i in range(6):
+        for i in range(7):
             if res[i] != MACIE_OK:
                 self.log.send(self._iam, ERROR, "ASIC configuration failed - write ASIC registers")
                 return False
@@ -1255,61 +1258,70 @@ class DC(threading.Thread):
         if self.handle == 0:
             return False
 
-        # Wait for available science data bytes
-        idleReset, moreDelay = 1, 2000
-        triggerTimeout = (T_frame * 1000) * (self.resets + idleReset) + moreDelay  # delay time for one frame
-        msg = "triggerTimeout: %.3f" % triggerTimeout
-        self.log.send(self._iam, DEBUG, msg)
-
         frame_cnt, current_cnt = 0, 0
         if self.samplingMode == UTR_MODE:
             frame_cnt = self.reads * self.ramps
         else:
             frame_cnt = self.reads * self.ramps * 2
 
+        # Wait for available science data bytes
+        idleReset, moreDelay = 1, 2000
+        triggerTimeout = (T_frame * 1000) * (self.resets + idleReset) + moreDelay  # delay time for one frame
+        msg = "triggerTimeout: %.3f" % (triggerTimeout * frame_cnt)
+        self.log.send(self._iam, DEBUG, msg)
+
+        start = FRAME_X * FRAME_Y
+        get_byte = start * 2
+        self.loadimg = []
+
+        arr_list = []
+        arr = np.array(arr_list)
+        data = arr.ctypes.data_as(POINTER(c_ushort))
+
         while current_cnt < frame_cnt:
             byte = 0
-            for i in range(100):
+            for i in range(100):# * frame_cnt):
                 if self.stop:
                     break
 
                 byte = lib.MACIE_AvailableScienceData(self.handle)
-                if byte > 0:
+                if byte >= (get_byte): # * frame_cnt):
                     msg = "Available science data = %d bytes, Loop = %d" % (
                         byte, i)
                     self.log.send(self._iam, INFO, msg)
+                    
+                    data = lib.MACIE_ReadGigeScienceFrame(self.handle, int(1500 + 5000))
+                    self.loadimg.append(data)
                     break
+
                 log = "Wait....(%d), stop(%d)" % (i, self.stop)
                 self.log.send(self._iam, INFO, log)
-                ti.sleep(triggerTimeout / 100 / 1000)
-
-            if self.stop:
-                self.log.send(self._iam, INFO, "Stop: Image Acquiring")
-                break
-
-            if byte <= 0:
-                self.log.send(self._iam, WARNING, "Trigger timeout: no available science data")
-                break
-
-            #data = None
-            arr_list = []
-            arr = np.array(arr_list)
-            data = arr.ctypes.data_as(POINTER(c_ushort))
-            
-            data = lib.MACIE_ReadGigeScienceFrame(self.handle, int(1500 + 5000))
-            if data == None:
-                self.log.send(self._iam, WARNING, "Null frame")
-                break
-                
-            start = FRAME_X * FRAME_Y
-            self.loadimg.append(data[start*current_cnt:start*(current_cnt+1)])
-
+                ti.sleep(0.1)
+                #ti.sleep(triggerTimeout / 100 / 1000)
             current_cnt += 1
+
+        if self.stop:
+            self.log.send(self._iam, INFO, "Stop: Image Acquiring")
+            return False
+
+        if byte <= 0:
+            self.log.send(self._iam, WARNING, "Trigger timeout: no available science data")
+            return False
+        
+        #data = lib.MACIE_ReadGigeScienceFrame(self.handle, int(1500 + 5000))
+        if data == None:
+            self.log.send(self._iam, WARNING, "Null frame")
+            return False
+        
+        #for i in range(frame_cnt):
+        #    self.loadimg.append(data[start*i:start*(i+1)])
+
+        #current_cnt += 1
 
         lib.MACIE_CloseGigeScienceInterface(self.handle, self.slctMACIEs)
 
-        if current_cnt != frame_cnt:
-            return False
+        #if current_cnt != frame_cnt:
+        #    return False
         
         self.folder_name, self.full_path = self.WriteFitsFile()
 
@@ -1326,24 +1338,26 @@ class DC(threading.Thread):
         msg = "triggerTimeout 1: %.3f" % triggerTimeout
         self.log.send(self._iam, DEBUG, msg)
 
-        ti.sleep(1.5)
+        ti.sleep(0.2)
         
         getByte, frameSize = 0, 0
         frameSize = (self.x_stop - self.x_start + 1) * (self.y_stop - self.y_start + 1)
         getByte = frameSize * 2
         #print(getByte)
         
+        self.loadimg = []
+
         byte = 0        
-        for i in range(20):
+        for i in range(100):
             byte = lib.MACIE_AvailableScienceData(self.handle)
-            if byte >= getByte:
-            #if byte > 0:
+            #if byte >= getByte:
+            if byte > 0:
                 msg = "Available science data = %d bytes, Loop = %d" % (
                     byte, i)
                 self.log.send(self._iam, INFO, msg)
                 break
             self.log.send(self._iam, INFO, "Wait (ROI)....")
-            ti.sleep(triggerTimeout / 20 / 1000)
+            ti.sleep(triggerTimeout / 100 / 1000)
 
         if byte <= 0:
             self.log.send(self._iam, WARNING, "Trigger timeout: no available science data")
@@ -1355,7 +1369,6 @@ class DC(threading.Thread):
         data = arr.ctypes.data_as(POINTER(c_ushort))
         
         data = lib.MACIE_ReadGigeScienceFrame(self.handle, int(1500 + 5000))
-
         if data == None:
             self.log.send(self._iam, WARNING, "Null frame (ROI)")
             return False
@@ -1403,7 +1416,6 @@ class DC(threading.Thread):
         path += folder_name + "/"
         self.createFolder(path)
 
-        '''
         dir_names = []
         for names in os.listdir(path):
             if names.find(".fits") < 0:
@@ -1413,9 +1425,9 @@ class DC(threading.Thread):
             next_idx = max(numbers) + 1
         else:
             next_idx = 1
-        '''
+        
         if self.next_idx == 0:
-            self.next_idx = 1
+            self.next_idx = next_idx
         path2 = path + str(self.next_idx) + "/"
         self.createFolder(path2)
         
@@ -1559,9 +1571,22 @@ class DC(threading.Thread):
         self.createFolder(path)
 
         #str = time.strftime("%Y%m%d_%H%M%S", time.localtime(time.time()))
-        folder_name = "%04d%02d%02d_%02d%02d%02d" % (cur_datetime[0], cur_datetime[1], cur_datetime[2], cur_datetime[3], cur_datetime[4], cur_datetime[5])
+        #folder_name = "%04d%02d%02d_%02d%02d%02d" % (cur_datetime[0], cur_datetime[1], cur_datetime[2], cur_datetime[3], cur_datetime[4], cur_datetime[5])
+        folder_name = "%04d%02d%02d" % (cur_datetime[0], cur_datetime[1], cur_datetime[2])
         path += folder_name + "/"
         self.createFolder(path)
+
+        dir_names = []
+        for names in os.listdir(path):
+            if names.find(".fits") < 0:
+                dir_names.append(names)
+        numbers = list(map(int, dir_names))
+        if len(numbers) > 0:
+            next_idx = max(numbers) + 1
+        else:
+            next_idx = 1
+
+        self.next_idx = next_idx
 
         filename = "%sH2RG_R01_M01_N01.fits" % path
         sts = self.save_fitsfile_sub(0, filename, cur_datetime, 1, 1, 1)
@@ -1577,261 +1602,264 @@ class DC(threading.Thread):
 
 
     def save_fitsfile_sub(self, idx, filename, cur_datetime, ramp, group, read):
-        
-        header_array = MACIE_FitsHdr * FITS_HDR_CNT
-        pHeaders = header_array()
+        try:
 
-        header_cnt = 0
+            header_array = MACIE_FitsHdr * FITS_HDR_CNT
+            pHeaders = header_array()
 
-        y, m, d = cur_datetime[0], cur_datetime[1], cur_datetime[2]
-        _h, _m, _s, _ms = cur_datetime[3], cur_datetime[4], cur_datetime[5], cur_datetime[6]
-        obs_datetime = "%04d-%02d-%02dT%02d:%02d:%02d.%03d" % (y, m, d, _h, _m, _s, _ms)
+            header_cnt = 0
 
-        t = Time(obs_datetime, format='isot', scale='utc')
-        julian = t.to_value('jd', 'long')
+            y, m, d = cur_datetime[0], cur_datetime[1], cur_datetime[2]
+            _h, _m, _s, _ms = cur_datetime[3], cur_datetime[4], cur_datetime[5], cur_datetime[6]
+            obs_datetime = "%04d-%02d-%02dT%02d:%02d:%02d.%03d" % (y, m, d, _h, _m, _s, _ms)
 
-        julian_time = "%f" % julian
-        pHeaders[header_cnt] = MACIE_FitsHdr(key="ACQTIME".encode(), valType=HDR_STR, sVal=julian_time.encode(), comment="UTC Julian time".encode())
-        header_cnt += 1
+            t = Time(obs_datetime, format='isot', scale='utc')
+            julian = t.to_value('jd', 'long')
 
-        pHeaders[header_cnt] = MACIE_FitsHdr(key="ACQTIME1".encode(), valType=HDR_STR, sVal=obs_datetime.encode(), comment="UTC time (YYYY-MM-DDTHH:MM:SS.MS)".encode())
-        header_cnt += 1
-
-        pHeaders[header_cnt] = MACIE_FitsHdr(key="UNITS".encode(), valType=HDR_STR, sVal="ADUs".encode(), comment="ADC digital steps".encode())
-        header_cnt += 1
-
-        pHeaders[header_cnt] = MACIE_FitsHdr(key="MUXTYPE".encode(), valType=HDR_INT, iVal=MUX_TYPE, comment="1- H1RG; 2- H2RG; 4- H4RG".encode())
-        header_cnt += 1
-
-        pHeaders[header_cnt] = MACIE_FitsHdr(key="NOUTPUTS".encode(), valType=HDR_INT, iVal=32, comment="Number of detector outputs".encode())
-        header_cnt += 1
-
-        pHeaders[header_cnt] = MACIE_FitsHdr(key="FRMMODE".encode(), valType=HDR_INT, iVal=self.ROIMode, comment="0- full frame mode; 1- window mode".encode())
-        header_cnt += 1
-
-        if self.samplingMode == UTR_MODE:
-            val = 0
-        else:
-            val = 1
-        pHeaders[header_cnt] = MACIE_FitsHdr(key="EXPMODE".encode(), valType=HDR_INT, iVal=val, comment="0-Ramp mode; 1- Fowler sampling mode".encode())
-        header_cnt += 1
-
-        pHeaders[header_cnt] = MACIE_FitsHdr(key="NRESETS".encode(), valType=HDR_INT, iVal=self.resets, comment="Number of resets before integration".encode())
-        header_cnt += 1
-
-        pHeaders[header_cnt] = MACIE_FitsHdr(key="FRMTIME".encode(), valType=HDR_FLOAT, fVal=T_frame, comment="Frame time".encode())        
-        header_cnt += 1
-
-        pHeaders[header_cnt] = MACIE_FitsHdr(key="EXPTIMET".encode(), valType=HDR_FLOAT, fVal=self.expTime, comment="sec, Exposure Time".encode())
-        header_cnt += 1
-        
-        pHeaders[header_cnt] = MACIE_FitsHdr(key="FOWLTIME".encode(), valType=HDR_FLOAT, fVal=self.fowlerTime, comment="sec, Fowler Time".encode())
-        header_cnt += 1
-
-        pHeaders[header_cnt] = MACIE_FitsHdr(key="ASICGAIN".encode(), valType=HDR_INT, iVal=self.preampGain, comment="8 (12dB, large Cin)".encode())
-        header_cnt += 1
-
-        val = "0x%04x" % self.preampInputVal
-        pHeaders[header_cnt] = MACIE_FitsHdr(key="AMPINPUT".encode(), valType=HDR_STR, sVal=val.encode(), comment="Preamp input".encode())
-        header_cnt += 1
-
-        _cmt = "V reset (0x%s)" % self.V_reset_addr
-        pHeaders[header_cnt] = MACIE_FitsHdr(key="VRESET".encode(), valType=HDR_STR, sVal=self.V_reset.encode(), comment=_cmt.encode())
-        header_cnt += 1
-
-        _cmt = "D sub (0x%s)" % self.D_sub_addr
-        pHeaders[header_cnt] = MACIE_FitsHdr(key="DSUB".encode(), valType=HDR_STR, sVal=self.D_sub.encode(), comment=_cmt.encode())
-        header_cnt += 1
-
-        _cmt = "V BiasGate (0x%s)" % self.V_biasgate_addr
-        pHeaders[header_cnt] = MACIE_FitsHdr(key="VBIASGAT".encode(), valType=HDR_STR, sVal=self.V_biasgate.encode(), comment=_cmt.encode())
-        header_cnt += 1
-
-        _cmt = "V Ref.Main (0x%s)" % self.V_refmain_addr
-        pHeaders[header_cnt] = MACIE_FitsHdr(key="VREFMAIN".encode(), valType=HDR_STR, sVal=self.V_refmain.encode(), comment=_cmt.encode())
-        header_cnt += 1
-
-        #-------------------------------------------------------------------------------------
-        #information
-        _name = IAM[-1]
-        pHeaders[header_cnt] = MACIE_FitsHdr(key="BAND".encode(), valType=HDR_STR, sVal=_name.encode(), comment="Band name".encode())
-        header_cnt += 1
-        
-        #_num = self.pCard[self.slctCard].contents.macieSerialNumber
-        _num = self.macieSN
-        pHeaders[header_cnt] = MACIE_FitsHdr(key="SERIALN".encode(), valType=HDR_INT, iVal=_num, comment="MACIE serial number".encode())
-        header_cnt += 1
-
-        pHeaders[header_cnt] = MACIE_FitsHdr(key="FIRMSLOT".encode(), valType=HDR_STR, sVal=self.pCard[self.slctCard].contents.firmwareSlot1, comment="MACIE slot id".encode())
-        header_cnt += 1
-
-        pHeaders[header_cnt] = MACIE_FitsHdr(key="SWVER".encode(), valType=HDR_FLOAT, fVal=lib.MACIE_LibVersion(), comment="Software version number".encode())
-        header_cnt += 1
-
-        pHeaders[header_cnt] = MACIE_FitsHdr(key="CONNECT".encode(), valType=HDR_INT, iVal=2, comment="0: NONE; 1: USB; 2: GigE; 3: UART".encode())
-        header_cnt += 1
-
-        pHeaders[header_cnt] = MACIE_FitsHdr(key="FASTMODE".encode(), valType=HDR_INT, iVal=0, comment="1: FastMode; 0: SlowMode".encode())
-        header_cnt += 1
-
-        pHeaders[header_cnt] = MACIE_FitsHdr(key="ASICSET".encode(), valType=HDR_STR, sVal=self.asic_file.encode(), comment="ASIC firmware file".encode())
-        header_cnt += 1
-
-        pHeaders[header_cnt] = MACIE_FitsHdr(key="MACIESET".encode(), valType=HDR_STR, sVal=self.macie_file.encode(), comment="MACIE register file".encode())
-        header_cnt += 1
-
-        #-------------------------------------------------------------------------------------
-        #temperature
-        if self.dewar_info:
-            pressure = "%.2e" % self.dewar_dict["pressure"]
-            pHeaders[header_cnt] = MACIE_FitsHdr(key="T_PRESSU".encode(), valType=HDR_STR, sVal=pressure.encode(), comment="Dewar Vacuum Pressure".encode())
+            julian_time = "%f" % julian
+            pHeaders[header_cnt] = MACIE_FitsHdr(key="ACQTIME".encode(), valType=HDR_STR, sVal=julian_time.encode(), comment="UTC Julian time".encode())
             header_cnt += 1
 
-            _val = "%.2f" % self.dewar_dict["bench"]
-            _fvalue = float(_val)
-            pHeaders[header_cnt] = MACIE_FitsHdr(key="T_BENCH".encode(), valType=HDR_FLOAT, fVal=_fvalue, comment="Dewar Temp. Optical Bench".encode())
+            pHeaders[header_cnt] = MACIE_FitsHdr(key="ACQTIME1".encode(), valType=HDR_STR, sVal=obs_datetime.encode(), comment="UTC time (YYYY-MM-DDTHH:MM:SS.MS)".encode())
+            header_cnt += 1
+
+            pHeaders[header_cnt] = MACIE_FitsHdr(key="UNITS".encode(), valType=HDR_STR, sVal="ADUs".encode(), comment="ADC digital steps".encode())
+            header_cnt += 1
+
+            pHeaders[header_cnt] = MACIE_FitsHdr(key="MUXTYPE".encode(), valType=HDR_INT, iVal=MUX_TYPE, comment="1- H1RG; 2- H2RG; 4- H4RG".encode())
+            header_cnt += 1
+
+            pHeaders[header_cnt] = MACIE_FitsHdr(key="NOUTPUTS".encode(), valType=HDR_INT, iVal=32, comment="Number of detector outputs".encode())
+            header_cnt += 1
+
+            pHeaders[header_cnt] = MACIE_FitsHdr(key="FRMMODE".encode(), valType=HDR_INT, iVal=self.ROIMode, comment="0- full frame mode; 1- window mode".encode())
+            header_cnt += 1
+
+            if self.samplingMode == UTR_MODE:
+                val = 0
+            else:
+                val = 1
+            pHeaders[header_cnt] = MACIE_FitsHdr(key="EXPMODE".encode(), valType=HDR_INT, iVal=val, comment="0-Ramp mode; 1- Fowler sampling mode".encode())
+            header_cnt += 1
+
+            pHeaders[header_cnt] = MACIE_FitsHdr(key="NRESETS".encode(), valType=HDR_INT, iVal=self.resets, comment="Number of resets before integration".encode())
+            header_cnt += 1
+
+            pHeaders[header_cnt] = MACIE_FitsHdr(key="FRMTIME".encode(), valType=HDR_FLOAT, fVal=T_frame, comment="Frame time".encode())        
+            header_cnt += 1
+
+            pHeaders[header_cnt] = MACIE_FitsHdr(key="EXPTIMET".encode(), valType=HDR_FLOAT, fVal=self.expTime, comment="sec, Exposure Time".encode())
             header_cnt += 1
             
-            _val = "%.2f" % self.dewar_dict["bench_sp"]
-            _fvalue = float(_val)
-            pHeaders[header_cnt] = MACIE_FitsHdr(key="SP_BENCH".encode(), valType=HDR_FLOAT, fVal=_fvalue, comment="Dewar SetP. Optical Bench".encode())
+            pHeaders[header_cnt] = MACIE_FitsHdr(key="FOWLTIME".encode(), valType=HDR_FLOAT, fVal=self.fowlerTime, comment="sec, Fowler Time".encode())
             header_cnt += 1
 
-            _val = "%.2f" % self.dewar_dict["grating"]
-            _fvalue = float(_val)
-            pHeaders[header_cnt] = MACIE_FitsHdr(key="T_GRATIN".encode(), valType=HDR_FLOAT, fVal=_fvalue, comment="Dewar Temp. Immersion Grating".encode())
-            header_cnt += 1  
-            
-            _val = "%.2f" % self.dewar_dict["grating_sp"]
-            _fvalue = float(_val)
-            pHeaders[header_cnt] = MACIE_FitsHdr(key="SP_GRATI".encode(), valType=HDR_FLOAT, fVal=_fvalue, comment="Dewar SetP. Immersion Grating".encode())
-            header_cnt += 1       
-
-            _val = "%.2f" % self.dewar_dict["detS"]
-            _fvalue = float(_val)
-            pHeaders[header_cnt] = MACIE_FitsHdr(key="T_DETS".encode(), valType=HDR_FLOAT, fVal=_fvalue, comment="Dewar Temp. Det S".encode())
-            header_cnt += 1
-            
-            _val = "%.2f" % self.dewar_dict["detS_sp"]
-            _fvalue = float(_val)
-            pHeaders[header_cnt] = MACIE_FitsHdr(key="SP_DETS".encode(), valType=HDR_FLOAT, fVal=_fvalue, comment="Dewar SetP. Det S".encode())
+            pHeaders[header_cnt] = MACIE_FitsHdr(key="ASICGAIN".encode(), valType=HDR_INT, iVal=self.preampGain, comment="8 (12dB, large Cin)".encode())
             header_cnt += 1
 
-            _val = "%.2f" % self.dewar_dict["detK"]
-            _fvalue = float(_val)
-            pHeaders[header_cnt] = MACIE_FitsHdr(key="T_DETK".encode(), valType=HDR_FLOAT, fVal=_fvalue, comment="Dewar Temp. Det K".encode())
-            header_cnt += 1
-            
-            _val = "%.2f" % self.dewar_dict["detK_sp"]
-            _fvalue = float(_val)
-            pHeaders[header_cnt] = MACIE_FitsHdr(key="SP_DETK".encode(), valType=HDR_FLOAT, fVal=_fvalue, comment="Dewar SetP. Det K".encode())
+            val = "0x%04x" % self.preampInputVal
+            pHeaders[header_cnt] = MACIE_FitsHdr(key="AMPINPUT".encode(), valType=HDR_STR, sVal=val.encode(), comment="Preamp input".encode())
             header_cnt += 1
 
-            _val = "%.2f" % self.dewar_dict["camH"]
-            _fvalue = float(_val)
-            pHeaders[header_cnt] = MACIE_FitsHdr(key="T_CAMH".encode(), valType=HDR_FLOAT, fVal=_fvalue, comment="Dewar Temp. Cam H".encode())
+            _cmt = "V reset (0x%s)" % self.V_reset_addr
+            pHeaders[header_cnt] = MACIE_FitsHdr(key="VRESET".encode(), valType=HDR_STR, sVal=self.V_reset.encode(), comment=_cmt.encode())
             header_cnt += 1
 
-            _val = "%.2f" % self.dewar_dict["detH"]
-            _fvalue = float(_val)
-            pHeaders[header_cnt] = MACIE_FitsHdr(key="T_DETH".encode(), valType=HDR_FLOAT, fVal=_fvalue, comment="Dewar Temp. Det H".encode())
+            _cmt = "D sub (0x%s)" % self.D_sub_addr
+            pHeaders[header_cnt] = MACIE_FitsHdr(key="DSUB".encode(), valType=HDR_STR, sVal=self.D_sub.encode(), comment=_cmt.encode())
+            header_cnt += 1
+
+            _cmt = "V BiasGate (0x%s)" % self.V_biasgate_addr
+            pHeaders[header_cnt] = MACIE_FitsHdr(key="VBIASGAT".encode(), valType=HDR_STR, sVal=self.V_biasgate.encode(), comment=_cmt.encode())
+            header_cnt += 1
+
+            _cmt = "V Ref.Main (0x%s)" % self.V_refmain_addr
+            pHeaders[header_cnt] = MACIE_FitsHdr(key="VREFMAIN".encode(), valType=HDR_STR, sVal=self.V_refmain.encode(), comment=_cmt.encode())
+            header_cnt += 1
+
+            #-------------------------------------------------------------------------------------
+            #information
+            _name = IAM[-1]
+            pHeaders[header_cnt] = MACIE_FitsHdr(key="BAND".encode(), valType=HDR_STR, sVal=_name.encode(), comment="Band name".encode())
             header_cnt += 1
             
-            _val = "%.2f" % self.dewar_dict["detH_sp"]
-            _fvalue = float(_val)
-            pHeaders[header_cnt] = MACIE_FitsHdr(key="SP_DETH".encode(), valType=HDR_FLOAT, fVal=_fvalue, comment="Dewar SetP. Det H".encode())
+            _num = self.pCard[self.slctCard].contents.macieSerialNumber
+            #_num = self.macieSN
+            pHeaders[header_cnt] = MACIE_FitsHdr(key="SERIALN".encode(), valType=HDR_INT, iVal=_num, comment="MACIE serial number".encode())
             header_cnt += 1
 
-            _val = "%.2f" % self.dewar_dict["benchcenter"]
-            _fvalue = float(_val)
-            pHeaders[header_cnt] = MACIE_FitsHdr(key="T_BENCEN".encode(), valType=HDR_FLOAT, fVal=_fvalue, comment="Dewar Temp. Bench center".encode())
+            pHeaders[header_cnt] = MACIE_FitsHdr(key="FIRMSLOT".encode(), valType=HDR_STR, sVal=self.pCard[self.slctCard].contents.firmwareSlot1, comment="MACIE slot id".encode())
             header_cnt += 1
 
-            _val = "%.2f" % self.dewar_dict["coldhead01"]
-            _fvalue = float(_val)
-            pHeaders[header_cnt] = MACIE_FitsHdr(key="T_COLDH1".encode(), valType=HDR_FLOAT, fVal=_fvalue, comment="Dewar Temp. 1st ColdHead".encode())
+            pHeaders[header_cnt] = MACIE_FitsHdr(key="SWVER".encode(), valType=HDR_FLOAT, fVal=lib.MACIE_LibVersion(), comment="Software version number".encode())
             header_cnt += 1
 
-            _val = "%.2f" % self.dewar_dict["coldhead02"]
-            _fvalue = float(_val)
-            pHeaders[header_cnt] = MACIE_FitsHdr(key="T_COLDH2".encode(), valType=HDR_FLOAT, fVal=_fvalue, comment="Dewar Temp. 2nd ColdHead".encode())
+            pHeaders[header_cnt] = MACIE_FitsHdr(key="CONNECT".encode(), valType=HDR_INT, iVal=2, comment="0: NONE; 1: USB; 2: GigE; 3: UART".encode())
             header_cnt += 1
+
+            pHeaders[header_cnt] = MACIE_FitsHdr(key="FASTMODE".encode(), valType=HDR_INT, iVal=0, comment="1: FastMode; 0: SlowMode".encode())
+            header_cnt += 1
+
+            pHeaders[header_cnt] = MACIE_FitsHdr(key="ASICSET".encode(), valType=HDR_STR, sVal=self.asic_file.encode(), comment="ASIC firmware file".encode())
+            header_cnt += 1
+
+            pHeaders[header_cnt] = MACIE_FitsHdr(key="MACIESET".encode(), valType=HDR_STR, sVal=self.macie_file.encode(), comment="MACIE register file".encode())
+            header_cnt += 1
+
+            #-------------------------------------------------------------------------------------
+            #temperature
+            if self.dewar_info:
+                pressure = "%.2e" % self.dewar_dict["pressure"]
+                pHeaders[header_cnt] = MACIE_FitsHdr(key="T_PRESSU".encode(), valType=HDR_STR, sVal=pressure.encode(), comment="Dewar Vacuum Pressure".encode())
+                header_cnt += 1
+
+                #_val = "%.02f" % self.dewar_dict["bench"]
+                #_fvalue = float(_val)
+                pHeaders[header_cnt] = MACIE_FitsHdr(key="T_BENCH".encode(), valType=HDR_FLOAT, fVal=self.dewar_dict["bench"], comment="Dewar Temp. Optical Bench".encode())
+                header_cnt += 1
+                
+                #_val = "%.02f" % self.dewar_dict["bench_sp"]
+                #_fvalue = float(_val)
+                pHeaders[header_cnt] = MACIE_FitsHdr(key="SP_BENCH".encode(), valType=HDR_FLOAT, fVal=self.dewar_dict["bench_sp"], comment="Dewar SetP. Optical Bench".encode())
+                header_cnt += 1
+
+                #_val = "%.02f" % self.dewar_dict["grating"]
+                #_fvalue = float(_val)
+                pHeaders[header_cnt] = MACIE_FitsHdr(key="T_GRATIN".encode(), valType=HDR_FLOAT, fVal=self.dewar_dict["grating"], comment="Dewar Temp. Immersion Grating".encode())
+                header_cnt += 1  
+                
+                #_val = "%.02f" % self.dewar_dict["grating_sp"]
+                #_fvalue = float(_val)
+                pHeaders[header_cnt] = MACIE_FitsHdr(key="SP_GRATI".encode(), valType=HDR_FLOAT, fVal=self.dewar_dict["grating_sp"], comment="Dewar SetP. Immersion Grating".encode())
+                header_cnt += 1       
+
+                #_val = "%.02f" % self.dewar_dict["detS"]
+                #_fvalue = float(_val)
+                pHeaders[header_cnt] = MACIE_FitsHdr(key="T_DETS".encode(), valType=HDR_FLOAT, fVal=self.dewar_dict["detS"], comment="Dewar Temp. Det S".encode())
+                header_cnt += 1
+                
+                #_val = "%.02f" % self.dewar_dict["detS_sp"]
+                #_fvalue = float(_val)
+                pHeaders[header_cnt] = MACIE_FitsHdr(key="SP_DETS".encode(), valType=HDR_FLOAT, fVal=self.dewar_dict["detS_sp"], comment="Dewar SetP. Det S".encode())
+                header_cnt += 1
+
+                #_val = "%.02f" % self.dewar_dict["detK"]
+                #_fvalue = float(_val)
+                pHeaders[header_cnt] = MACIE_FitsHdr(key="T_DETK".encode(), valType=HDR_FLOAT, fVal=self.dewar_dict["detK"], comment="Dewar Temp. Det K".encode())
+                header_cnt += 1
+                
+                #_val = "%.02f" % self.dewar_dict["detK_sp"]
+                #_fvalue = float(_val)
+                pHeaders[header_cnt] = MACIE_FitsHdr(key="SP_DETK".encode(), valType=HDR_FLOAT, fVal=self.dewar_dict["detK_sp"], comment="Dewar SetP. Det K".encode())
+                header_cnt += 1
+
+                #_val = "%.02f" % self.dewar_dict["camH"]
+                #_fvalue = float(_val)
+                pHeaders[header_cnt] = MACIE_FitsHdr(key="T_CAMH".encode(), valType=HDR_FLOAT, fVal=self.dewar_dict["camH"], comment="Dewar Temp. Cam H".encode())
+                header_cnt += 1
+
+                #_val = "%.02f" % self.dewar_dict["detH"]
+                #_fvalue = float(_val)
+                pHeaders[header_cnt] = MACIE_FitsHdr(key="T_DETH".encode(), valType=HDR_FLOAT, fVal=self.dewar_dict["detH"], comment="Dewar Temp. Det H".encode())
+                header_cnt += 1
+                
+                #_val = "%.02f" % self.dewar_dict["detH_sp"]
+                #_fvalue = float(_val)
+                pHeaders[header_cnt] = MACIE_FitsHdr(key="SP_DETH".encode(), valType=HDR_FLOAT, fVal=self.dewar_dict["detH_sp"], comment="Dewar SetP. Det H".encode())
+                header_cnt += 1
+
+                #_val = "%.02f" % self.dewar_dict["benchcenter"]
+                #_fvalue = float(_val)
+                pHeaders[header_cnt] = MACIE_FitsHdr(key="T_BENCEN".encode(), valType=HDR_FLOAT, fVal=self.dewar_dict["benchcenter"], comment="Dewar Temp. Bench center".encode())
+                header_cnt += 1
+
+                #_val = "%.02f" % self.dewar_dict["coldhead01"]
+                #_fvalue = float(_val)
+                pHeaders[header_cnt] = MACIE_FitsHdr(key="T_COLDH1".encode(), valType=HDR_FLOAT, fVal=self.dewar_dict["coldhead01"], comment="Dewar Temp. 1st ColdHead".encode())
+                header_cnt += 1
+
+                #_val = "%.02f" % self.dewar_dict["coldhead02"]
+                #_fvalue = float(_val)
+                pHeaders[header_cnt] = MACIE_FitsHdr(key="T_COLDH2".encode(), valType=HDR_FLOAT, fVal=self.dewar_dict["coldhead02"], comment="Dewar Temp. 2nd ColdHead".encode())
+                header_cnt += 1
+                
+                #_val = "%.02f" % self.dewar_dict["coldstop"]
+                #_fvalue = float(_val)
+                pHeaders[header_cnt] = MACIE_FitsHdr(key="T_COLDST".encode(), valType=HDR_FLOAT, fVal=self.dewar_dict["coldstop"], comment="Dewar Temp. Cold stop".encode())
+                header_cnt += 1
+
+                #_val = "%.02f" % self.dewar_dict["charcoalBox"]
+                #_fvalue = float(_val)
+                pHeaders[header_cnt] = MACIE_FitsHdr(key="T_CARBOX".encode(), valType=HDR_FLOAT, fVal=self.dewar_dict["charcoalBox"], comment="Dewar Temp. Charcoal Box".encode())
+                header_cnt += 1
+
+                #_val = "%.02f" % self.dewar_dict["camK"]
+                #_fvalue = float(_val)
+                pHeaders[header_cnt] = MACIE_FitsHdr(key="T_CAMK".encode(), valType=HDR_FLOAT, fVal=self.dewar_dict["camK"], comment="Dewar Temp. Cam K".encode())
+                header_cnt += 1
+
+                #_val = "%.02f" % self.dewar_dict["shieldtop"]
+                #_fvalue = float(_val)
+                pHeaders[header_cnt] = MACIE_FitsHdr(key="T_SHTOP".encode(), valType=HDR_FLOAT, fVal=self.dewar_dict["shieldtop"], comment="Dewar Temp. Rad. Shield".encode())
+                header_cnt += 1
+
+                #_val = "%.02f" % self.dewar_dict["air"]
+                #_fvalue = float(_val)
+                pHeaders[header_cnt] = MACIE_FitsHdr(key="T_AIR".encode(), valType=HDR_FLOAT, fVal=self.dewar_dict["air"], comment="Dewar Temp. Rack".encode())
+                header_cnt += 1
+
+            #-------------------------------------------------------------------------------------
             
-            _val = "%.2f" % self.dewar_dict["coldstop"]
-            _fvalue = float(_val)
-            pHeaders[header_cnt] = MACIE_FitsHdr(key="T_COLDST".encode(), valType=HDR_FLOAT, fVal=_fvalue, comment="Dewar Temp. Cold stop".encode())
+            pHeaders[header_cnt] = MACIE_FitsHdr(key="SEQNUM_R".encode(), valType=HDR_INT, iVal=ramp, comment="Ramp number".encode())
             header_cnt += 1
 
-            _val = "%.2f" % self.dewar_dict["charcoalBox"]
-            _fvalue = float(_val)
-            pHeaders[header_cnt] = MACIE_FitsHdr(key="T_CARBOX".encode(), valType=HDR_FLOAT, fVal=_fvalue, comment="Dewar Temp. Charcoal Box".encode())
+            pHeaders[header_cnt] = MACIE_FitsHdr(key="SEQNUM_N".encode(), valType=HDR_INT, iVal=read, comment="Sample number within group".encode())
             header_cnt += 1
 
-            _val = "%.2f" % self.dewar_dict["camK"]
-            _fvalue = float(_val)
-            pHeaders[header_cnt] = MACIE_FitsHdr(key="T_CAMK".encode(), valType=HDR_FLOAT, fVal=_fvalue, comment="Dewar Temp. Cam K".encode())
-            header_cnt += 1
-
-            _val = "%.2f" % self.dewar_dict["shieldtop"]
-            _fvalue = float(_val)
-            pHeaders[header_cnt] = MACIE_FitsHdr(key="T_SHTOP".encode(), valType=HDR_FLOAT, fVal=_fvalue, comment="Dewar Temp. Rad. Shield".encode())
-            header_cnt += 1
-
-            _val = "%.2f" % self.dewar_dict["air"]
-            _fvalue = float(_val)
-            pHeaders[header_cnt] = MACIE_FitsHdr(key="T_AIR".encode(), valType=HDR_FLOAT, fVal=_fvalue, comment="Dewar Temp. Rack".encode())
-            header_cnt += 1
-
-        #-------------------------------------------------------------------------------------
-        
-        pHeaders[header_cnt] = MACIE_FitsHdr(key="SEQNUM_R".encode(), valType=HDR_INT, iVal=ramp, comment="Ramp number".encode())
-        header_cnt += 1
-
-        pHeaders[header_cnt] = MACIE_FitsHdr(key="SEQNUM_N".encode(), valType=HDR_INT, iVal=read, comment="Sample number within group".encode())
-        header_cnt += 1
-
-        if self.samplingMode != UTR_MODE:
-            base_fomula = T_frame * read + self.fowlerTime * (read-1)
-            integratingT = 0
-            if self.samplingMode == CDS_MODE:
-                integratingT = base_fomula
-
-            elif self.samplingMode == CDSNOISE_MODE:
-                if ramp == 1:
+            if self.samplingMode != UTR_MODE:
+                base_fomula = T_frame * read + self.fowlerTime * (read-1)
+                integratingT = 0
+                if self.samplingMode == CDS_MODE:
                     integratingT = base_fomula
-                else:
-                    integratingT = (T_frame * 2 + self.fowlerTime) + base_fomula
 
-            elif self.samplingMode == FOWLER_MODE:
-                if group == 1:
-                    integratingT = T_frame * read
-                else:
-                    integratingT = (T_frame * self.reads + self.fowlerTime) + T_frame * read
-            
-            pHeaders[header_cnt] = MACIE_FitsHdr(key="INTTIME".encode(), valType=HDR_FLOAT, fVal=integratingT, comment="integration time".encode())
+                elif self.samplingMode == CDSNOISE_MODE:
+                    if ramp == 1:
+                        integratingT = base_fomula
+                    else:
+                        integratingT = (T_frame * 2 + self.fowlerTime) + base_fomula
+
+                elif self.samplingMode == FOWLER_MODE:
+                    if group == 1:
+                        integratingT = T_frame * read
+                    else:
+                        integratingT = (T_frame * self.reads + self.fowlerTime) + T_frame * read
+                
+                pHeaders[header_cnt] = MACIE_FitsHdr(key="INTTIME".encode(), valType=HDR_FLOAT, fVal=integratingT, comment="integration time".encode())
+                header_cnt += 1
+                
+            pHeaders[header_cnt] = MACIE_FitsHdr(key="SEQNUM_M".encode(), valType=HDR_INT, iVal=group, comment="1- before exposure; 2- after exposure.".encode())
             header_cnt += 1
+
+            str = "R%02d_M%02d" % (ramp, group)
+            pHeaders[header_cnt] = MACIE_FitsHdr(key="SEQNNAME".encode(), valType=HDR_STR, sVal=str.encode(), comment="Ramp and Group String".encode())
+            header_cnt += 1
+
+            if self.ROIMode:
+                arr = np.array(self.loadimg, dtype=np.int16)
+                data = arr.ctypes.data_as(POINTER(c_ushort))
+                sts = lib.MACIE_WriteFitsFile(c_char_p(filename.encode()), self.x_stop - self.x_start + 1, self.y_stop - self.y_start + 1, data, header_cnt, pHeaders)
+            else:
+                arr = np.array(self.loadimg[idx], dtype=np.int16)
+                data = arr.ctypes.data_as(POINTER(c_ushort))
+                sts = lib.MACIE_WriteFitsFile(c_char_p(filename.encode()), FRAME_X, FRAME_Y, data, header_cnt, pHeaders)
             
-        pHeaders[header_cnt] = MACIE_FitsHdr(key="SEQNUM_M".encode(), valType=HDR_INT, iVal=group, comment="1- before exposure; 2- after exposure.".encode())
-        header_cnt += 1
-
-        str = "R%02d_M%02d" % (ramp, group)
-        pHeaders[header_cnt] = MACIE_FitsHdr(key="SEQNNAME".encode(), valType=HDR_STR, sVal=str.encode(), comment="Ramp and Group String".encode())
-        header_cnt += 1
-
-        if self.ROIMode:
-            arr = np.array(self.loadimg, dtype=np.int16)
-            data = arr.ctypes.data_as(POINTER(c_ushort))
-            sts = lib.MACIE_WriteFitsFile(c_char_p(filename.encode()), self.x_stop - self.x_start + 1, self.y_stop - self.y_start + 1, data, header_cnt, pHeaders)
-        else:
-            arr = np.array(self.loadimg[idx], dtype=np.int16)
-            data = arr.ctypes.data_as(POINTER(c_ushort))
-            sts = lib.MACIE_WriteFitsFile(c_char_p(filename.encode()), FRAME_X, FRAME_Y, data, header_cnt, pHeaders)
-        
-        # for tunning test
-        if self.samplingMode == UTR_MODE:
-            offset, active = tn.cal_mean(filename)
-            tunning = "%s: %.4f, %.4f" % (self.V_refmain, offset, active)
-            self.log.send(self._iam, DEBUG, tunning)
+            # for tunning test
+            if self.samplingMode == UTR_MODE:
+                offset, active = tn.cal_mean(filename)
+                tunning = "%s: %.4f, %.4f" % (self.V_refmain, offset, active)
+                self.log.send(self._iam, DEBUG, tunning)
+        except:
+            sts = MACIE_FAIL
 
         return sts
 
