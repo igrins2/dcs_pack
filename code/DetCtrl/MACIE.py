@@ -64,6 +64,9 @@ lib.MACIE_ResetErrorCounters.restype = c_int
 lib.MACIE_WriteASICReg.argtypes = [c_ulong, c_ubyte, c_ushort, c_uint, c_bool]
 lib.MACIE_WriteASICReg.restype = c_int
 
+lib.MACIE_WriteASICBlock.argtypes = [c_ulong, c_ubyte, c_ushort, POINTER(c_uint), c_int, c_bool]
+lib.MACIE_WriteASICBlock.restype = c_int
+
 lib.MACIE_DownloadASICFile.argtypes = [c_ulong, c_ubyte, c_char_p, c_bool] 
 lib.MACIE_DownloadASICFile.restype = c_int
 

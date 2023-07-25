@@ -84,6 +84,9 @@ class MainWindow(Ui_Dialog, QMainWindow):
 
         #-------------------------------------------------------
 
+        self.producer = None
+        self.consumer = None
+        
         self.init_events()
 
         self.label_IAM.setText(IAM)
@@ -127,9 +130,6 @@ class MainWindow(Ui_Dialog, QMainWindow):
         self.fitsfullpath = ""
 
         self.prog_sts.setValue(0)
-
-        self.producer = None
-        self.consumer = None
 
         self.param = ""
 
@@ -470,6 +470,9 @@ class MainWindow(Ui_Dialog, QMainWindow):
             self.e_x_stop.setEnabled(False)
             self.e_y_start.setEnabled(False)
             self.e_y_stop.setEnabled(False)
+
+        msg = "%s %s" % (CMD_SETDETECTOR, self.cmb_ouput_channels.currentText())
+        self.publish_to_queue(msg)
             
             
 
@@ -493,7 +496,7 @@ class MainWindow(Ui_Dialog, QMainWindow):
 
         self.QWidgetBtnColor(self.btn_initialize2, "yellow", "blue")
 
-        msg = "%s %d %s %s %s" % (CMD_INITIALIZE2, MUX_TYPE, self.cmb_ouput_channels.currentText(), self.macie_file, self.asic_file)
+        msg = "%s %s %s %s" % (CMD_INITIALIZE2, self.cmb_ouput_channels.currentText(), self.macie_file, self.asic_file)
         self.publish_to_queue(msg)
 
 

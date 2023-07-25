@@ -143,9 +143,9 @@ class DC(threading.Thread):
         self.expTime = 0.0
         self.fowlerTime = 0.0
 
-        self.preampInputScheme = 1    # 2
+        self.preampInputScheme =  1    # 2
         self.preampInputVal = 0x4502    # 0xaaaa
-        self.preampGain = 8  # 1
+        self.preampGain = 8
 
         # hardware addr
         self.V_reset_addr = hex(int(0))
@@ -168,6 +168,9 @@ class DC(threading.Thread):
         self.loadimg = []
 
         self.measured_startT = 0
+        self.measured_durationT = 0
+
+        self.full_path = None
 
         self.next_idx = 0
         
@@ -463,18 +466,22 @@ class DC(threading.Thread):
                     self.publish_to_local_queue(msg)
 
             elif param[0] == CMD_INITIALIZE2:
-                self.macie_file = param[3]
-                self.asic_file = param[4]
+                self.macie_file = param[2]
+                self.asic_file = param[3]
                 if self.Initialize2() == False:
                     continue
                 if self.ResetASIC() == False:
                     continue
                 if self.DownloadMCD() == False:
                     continue
-                if self.SetDetector(int(param[1]), int(param[2])):
+                if self.SetDetector(MUX_TYPE, int(param[1])):
                     self.publish_to_local_queue(CMD_INITIALIZE2)
 
                 self.load_ASIC()
+
+            elif param[0] == CMD_SETDETECTOR:
+                if self.SetDetector(MUX_TYPE, int(param[1])):
+                    pass
 
             elif param[0] == CMD_RESET:
                 if self.ResetASIC():
@@ -503,7 +510,7 @@ class DC(threading.Thread):
                     if self.AcquireRamp_window() == False:
                         continue
                     if self.ImageAcquisition_window():
-                        msg = "%s 0 %s" % (CMD_ACQUIRERAMP, self.full_path)
+                        msg = "%s %.3f %s" % (CMD_ACQUIRERAMP, self.measured_durationT, self.full_path)
                         self.publish_to_local_queue(msg)
 
             elif param[0] == CMD_ASICLOAD:
@@ -1175,8 +1182,13 @@ class DC(threading.Thread):
         res[2] = lib.MACIE_WriteASICReg(self.handle, self.slctASICs, ASICAddr_ASICPreAmpGainVal, self.preampGain, self.option)
         res[3] = lib.MACIE_WriteASICReg(self.handle, self.slctASICs, ASICAddr_NReads, 1, self.option)
 
-        
-        res[4] = lib.MACIE_WriteASICReg(self.handle, self.slctASICs, ASICAddr_HxRGExpModeVal, 2, self.option)  # UTR, window
+        if self.samplingMode == UTR_MODE:
+            res[4] = lib.MACIE_WriteASICReg(self.handle, self.slctASICs, ASICAddr_HxRGExpModeVal, 2, self.option)  # UTR, window
+        elif self.samplingMode == FOWLER_MODE:
+            res[4] = lib.MACIE_WriteASICReg(self.handle, self.slctASICs, ASICAddr_HxRGExpModeVal, 3, self.option)  # Fowler, window
+        else:
+            return False
+
         arr_list = [self.x_start, self.x_stop, self.y_start, self.y_stop] # x1, x2, y1, y2
         arr = np.array(arr_list)
         winarr = arr.ctypes.data_as(POINTER(c_uint))
@@ -1227,9 +1239,11 @@ class DC(threading.Thread):
             self.log.send(self._iam, INFO, msg)
             return False
 
-        if lib.MACIE_WriteASICReg(self.handle, self.slctASICs, ASICAddr_NReads, 15, self.option) != MACIE_OK:
+        
+        if lib.MACIE_WriteASICReg(self.handle, self.slctASICs, ASICAddr_NReads, 1, self.option) != MACIE_OK:
             self.log.send(self._iam, ERROR, "write ASIC h4001 " + RET_FAIL)
             return False
+
 
         if lib.MACIE_WriteASICReg(self.handle, self.slctASICs, ASICAddr_State, 0x8001, self.option) != MACIE_OK:
             self.log.send(self._iam, ERROR, "Triggering " + RET_FAIL)
@@ -1272,33 +1286,23 @@ class DC(threading.Thread):
 
         start = FRAME_X * FRAME_Y
         get_byte = start * 2
-        self.loadimg = []
 
-        arr_list = []
-        arr = np.array(arr_list)
-        data = arr.ctypes.data_as(POINTER(c_ushort))
+        byte = 0
+        for i in range(int(triggerTimeout/100 * frame_cnt * 2)):
+            if self.stop:
+                break
 
-        while current_cnt < frame_cnt:
-            byte = 0
-            for i in range(100):# * frame_cnt):
-                if self.stop:
-                    break
+            byte = lib.MACIE_AvailableScienceData(self.handle)
+            if byte >= (get_byte * frame_cnt):
+                msg = "Available science data = %d bytes, Loop = %d" % (
+                    byte, i)
+                self.log.send(self._iam, INFO, msg)                
+                break
 
-                byte = lib.MACIE_AvailableScienceData(self.handle)
-                if byte >= (get_byte): # * frame_cnt):
-                    msg = "Available science data = %d bytes, Loop = %d" % (
-                        byte, i)
-                    self.log.send(self._iam, INFO, msg)
-                    
-                    data = lib.MACIE_ReadGigeScienceFrame(self.handle, int(1500 + 5000))
-                    self.loadimg.append(data)
-                    break
-
-                log = "Wait....(%d), stop(%d)" % (i, self.stop)
-                self.log.send(self._iam, INFO, log)
-                ti.sleep(0.1)
-                #ti.sleep(triggerTimeout / 100 / 1000)
-            current_cnt += 1
+            log = "Wait....(%d), stop(%d)" % (i, self.stop)
+            self.log.send(self._iam, INFO, log)
+            #ti.sleep(1)
+            ti.sleep(triggerTimeout / 100 / 1000)
 
         if self.stop:
             self.log.send(self._iam, INFO, "Stop: Image Acquiring")
@@ -1307,21 +1311,21 @@ class DC(threading.Thread):
         if byte <= 0:
             self.log.send(self._iam, WARNING, "Trigger timeout: no available science data")
             return False
-        
-        #data = lib.MACIE_ReadGigeScienceFrame(self.handle, int(1500 + 5000))
+
+        arr_list = []
+        arr = np.array(arr_list)
+        data = arr.ctypes.data_as(POINTER(c_ushort))
+        data = lib.MACIE_ReadGigeScienceFrame(self.handle, int(1500 + 5000))
+
         if data == None:
             self.log.send(self._iam, WARNING, "Null frame")
             return False
-        
-        #for i in range(frame_cnt):
-        #    self.loadimg.append(data[start*i:start*(i+1)])
 
-        #current_cnt += 1
+        self.loadimg = []
+        for i in range(frame_cnt):
+            self.loadimg.append(data[start*i:start*(i+1)])
 
         lib.MACIE_CloseGigeScienceInterface(self.handle, self.slctMACIEs)
-
-        #if current_cnt != frame_cnt:
-        #    return False
         
         self.folder_name, self.full_path = self.WriteFitsFile()
 
@@ -1332,32 +1336,29 @@ class DC(threading.Thread):
         if self.handle == 0:
             return False
 
-        # Wait for available science data bytes
-        idleReset, moreDelay = 1, 2000
-        triggerTimeout = (T_frame * 1000) * (self.resets + idleReset) + moreDelay  # delay time for one frame
+        #getByte, frameSize = 0, 0
+        #frameSize = (self.x_stop - self.x_start + 1) * (self.y_stop - self.y_start + 1)
+        #getByte = frameSize * 2
+
+        reset, idleReset, moreDelay = 1, 1, 4000
+        triggerTimeout = (T_frame * 1000) * (reset+idleReset) + moreDelay
         msg = "triggerTimeout 1: %.3f" % triggerTimeout
         self.log.send(self._iam, DEBUG, msg)
 
-        ti.sleep(0.2)
-        
-        getByte, frameSize = 0, 0
-        frameSize = (self.x_stop - self.x_start + 1) * (self.y_stop - self.y_start + 1)
-        getByte = frameSize * 2
-        #print(getByte)
-        
-        self.loadimg = []
+        #ti.sleep(0.2)
 
         byte = 0        
-        for i in range(100):
+        for i in range(20):
             byte = lib.MACIE_AvailableScienceData(self.handle)
-            #if byte >= getByte:
-            if byte > 0:
+            if byte >= getByte:
+            #if byte > 0:
                 msg = "Available science data = %d bytes, Loop = %d" % (
                     byte, i)
                 self.log.send(self._iam, INFO, msg)
+                print(msg)
                 break
             self.log.send(self._iam, INFO, "Wait (ROI)....")
-            ti.sleep(triggerTimeout / 100 / 1000)
+            ti.sleep(triggerTimeout / 20 / 1000)
 
         if byte <= 0:
             self.log.send(self._iam, WARNING, "Trigger timeout: no available science data")
@@ -1368,16 +1369,19 @@ class DC(threading.Thread):
         arr = np.array(arr_list)
         data = arr.ctypes.data_as(POINTER(c_ushort))
         
+        #for i in range(15):
         data = lib.MACIE_ReadGigeScienceFrame(self.handle, int(1500 + 5000))
+            
         if data == None:
             self.log.send(self._iam, WARNING, "Null frame (ROI)")
             return False
 
+        #self.loadimg.append(data[0:frameSize])
         self.loadimg = data
 
-        lib.MACIE_CloseGigeScienceInterface(self.handle, self.slctMACIEs)
+        lib.MACIE_CloseGigeScienceInterface(self.handle, self.slctMACIEs) 
 
-        self.folder_name = self.WriteFitsFile_window()
+        tmp, self.full_path = self.WriteFitsFile()      
 
         return True
 
@@ -1392,7 +1396,11 @@ class DC(threading.Thread):
 
         
     def WriteFitsFile(self, local = True):
-        self.log.send(self._iam, INFO, "Write Fits file now....")
+
+        if self.ROIMode:
+            self.log.send(self._iam, INFO, "Write Fits file now (ROI)....")
+        else:
+            self.log.send(self._iam, INFO, "Write Fits file now....")
 
         _t = datetime.datetime.utcnow()
 
@@ -1443,7 +1451,7 @@ class DC(threading.Thread):
 
                         if sts != MACIE_OK:
                             self.log.send(self._iam, ERROR, self.GetErrMsg())
-                            return -1
+                            return None, None
                         else:
                             self.log.send(self._iam, INFO, filename)
 
@@ -1459,7 +1467,7 @@ class DC(threading.Thread):
                 self.log.send(self._iam, INFO, ds9)
             '''
 
-            return '', filename
+            return None, filename
 
         elif self.samplingMode == CDS_MODE:  # ramp=1, group=1, read=1
             for read in range(self.reads*2):
@@ -1468,7 +1476,7 @@ class DC(threading.Thread):
 
                 if sts != MACIE_OK:
                     self.log.send(self._iam, ERROR, self.GetErrMsg())
-                    return -1
+                    return None, None
                 else:
                     self.log.send(self._iam, INFO, filename)
 
@@ -1482,7 +1490,7 @@ class DC(threading.Thread):
 
                     if sts != MACIE_OK:
                         self.log.send(self._iam, ERROR, self.GetErrMsg())
-                        return -1
+                        return None, None
                     else:
                         self.log.send(self._iam, INFO, filename)
 
@@ -1496,7 +1504,7 @@ class DC(threading.Thread):
 
                     if sts != MACIE_OK:
                         self.log.send(self._iam, ERROR, self.GetErrMsg())
-                        return -1
+                        return None, None
                     else:
                         self.log.send(self._iam, INFO, filename)
 
@@ -1587,8 +1595,10 @@ class DC(threading.Thread):
             next_idx = 1
 
         self.next_idx = next_idx
+        path2 = path + str(self.next_idx) + "/"
+        self.createFolder(path2)
 
-        filename = "%sH2RG_R01_M01_N01.fits" % path
+        filename = "%sH2RG_R01_M01_N01.fits" % path2
         sts = self.save_fitsfile_sub(0, filename, cur_datetime, 1, 1, 1)
 
         if sts != MACIE_OK:
@@ -1785,7 +1795,7 @@ class DC(threading.Thread):
                 
                 #_val = "%.02f" % self.dewar_dict["coldstop"]
                 #_fvalue = float(_val)
-                pHeaders[header_cnt] = MACIE_FitsHdr(key="T_COLDST".encode(), valType=HDR_FLOAT, fVal=self.dewar_dict["coldstop"], comment="Dewar Temp. Cold stop".encode())
+                pHeaders[header_cnt] = MACIE_FitsHdr(key="T_COLDST".encode(), valType=HDR_FLOAT, fVal=self.dewar_dict["coldstop"], comment="Dewar Temp. Heater Cover".encode())
                 header_cnt += 1
 
                 #_val = "%.02f" % self.dewar_dict["charcoalBox"]
@@ -1845,16 +1855,16 @@ class DC(threading.Thread):
             header_cnt += 1
 
             if self.ROIMode:
-                arr = np.array(self.loadimg, dtype=np.int16)
-                data = arr.ctypes.data_as(POINTER(c_ushort))
-                sts = lib.MACIE_WriteFitsFile(c_char_p(filename.encode()), self.x_stop - self.x_start + 1, self.y_stop - self.y_start + 1, data, header_cnt, pHeaders)
+                #arr = np.array(self.loadimg[idx], dtype=np.int16)
+                #data = arr.ctypes.data_as(POINTER(c_ushort))
+                sts = lib.MACIE_WriteFitsFile(c_char_p(filename.encode()), self.x_stop - self.x_start + 1, self.y_stop - self.y_start + 1, self.loadimg, header_cnt, pHeaders)
             else:
                 arr = np.array(self.loadimg[idx], dtype=np.int16)
                 data = arr.ctypes.data_as(POINTER(c_ushort))
                 sts = lib.MACIE_WriteFitsFile(c_char_p(filename.encode()), FRAME_X, FRAME_Y, data, header_cnt, pHeaders)
             
             # for tunning test
-            if self.samplingMode == UTR_MODE:
+            if not self.ROIMode and self.samplingMode == UTR_MODE:
                 offset, active = tn.cal_mean(filename)
                 tunning = "%s: %.4f, %.4f" % (self.V_refmain, offset, active)
                 self.log.send(self._iam, DEBUG, tunning)
