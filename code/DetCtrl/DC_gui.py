@@ -213,137 +213,141 @@ class MainWindow(Ui_Dialog, QMainWindow):
 
         param = self.param.split()
 
-        self.busy = False            
+        self.busy = False        
+    
+        try: 
+            if param[0] == CMD_VERSION:
+                if bool(int(param[3])):
+                    info = "%s (%s)" % (param[1], param[2])
+                    self.label_ver.setText(info)
 
-        if param[0] == CMD_VERSION:
-            if bool(int(param[3])):
+                    self.QWidgetBtnColor(self.btn_initialize1, "white", "green") 
+                    self.btn_initialize1.setEnabled(False)
+                    self.e_timeout.setEnabled(False)
+
+                else:
+                    self.label_ver.setText(param[1])
+
+                    self.QWidgetBtnColor(self.btn_initialize1, "black") 
+                    self.btn_initialize1.setEnabled(True)
+                    self.e_timeout.setEnabled(True)
+            
+            elif param[0] == CMD_INITIALIZE1:          
+                self.QWidgetBtnColor(self.btn_initialize1, "white", "green") 
+
                 info = "%s (%s)" % (param[1], param[2])
                 self.label_ver.setText(info)
 
-                self.QWidgetBtnColor(self.btn_initialize1, "white", "green") 
                 self.btn_initialize1.setEnabled(False)
                 self.e_timeout.setEnabled(False)
-
-            else:
-                self.label_ver.setText(param[1])
-
-                self.QWidgetBtnColor(self.btn_initialize1, "black") 
-                self.btn_initialize1.setEnabled(True)
-                self.e_timeout.setEnabled(True)
-        
-        elif param[0] == CMD_INITIALIZE1:          
-            self.QWidgetBtnColor(self.btn_initialize1, "white", "green") 
-
-            info = "%s (%s)" % (param[1], param[2])
-            self.label_ver.setText(info)
-
-            self.btn_initialize1.setEnabled(False)
-            self.e_timeout.setEnabled(False)
-        
-        elif param[0] == CMD_INITIALIZE2:
-            self.QWidgetBtnColor(self.btn_initialize2, "black")
-
-        elif param[0] == CMD_RESET:
-            self.QWidgetBtnColor(self.btn_reset, "black")
-
-        #elif param[0] == CMD_DOWNLOAD:
-        #    pass
-        #elif param[0] == CMD_SETDETECTOR:
-        #    pass
-        #elif param[0] == CMD_ERRCOUNT:
-        #    self.read_addr(self.e_addr_Vreset.text())
-        #    self.read_addr(self.e_addr_Dsub.text())
-        #    self.read_addr(self.e_addr_Vbiasgate.text())
-        #    self.read_addr(self.e_addr_Vrefmain.text())
-
-        #elif param[0] == CMD_SETRAMPPARAM:
-        #    self.acquireramp()  
-
-        #elif param[0] == CMD_SETFSPARAM:
-        #    self.acquireramp()         
-
-        elif param[0] == CMD_ACQUIRERAMP:
-
-            self.QWidgetBtnColor(self.btn_acquireramp, "black")
-
-            self.prog_timer.stop()
-            self.cur_prog_step = 100
-            self.prog_sts.setValue(self.cur_prog_step)
-
-            self.elapsed_timer.stop()
-
-            self.fitsfullpath = param[2]
-
-            show_cur_cnt = "%d / %s" % (self.cur_cnt, self.e_repeat.text())
-            self.label_cur_num.setText(show_cur_cnt)
-
-            if self.cur_cnt < int(self.e_repeat.text()):
-                #self.acquireramp()
-                #ti.sleep(0.5)
-                self.btn_acquireramp.click()
-            else:
-                self.cur_cnt = 0
-
-            self.label_measured_time.setText(param[1])
-
-            if self.chk_show_fits.isChecked():
-                ds9 = WORKING_DIR + 'DCS/ds9'
-                subprocess.Popen([ds9, self.fitsfullpath])
-
-            if self.chk_autosave.isChecked():
-                file = param[2].split("/")
-                #path = ""
-                #for i in file[1:-1]:
-                #    path += "/"
-                #    path += i
-                #self.e_user_dir.setText(path)
-                self.e_user_file.setText(file[-1][:-5] + "_")
-                       
-
-        elif param[0] == CMD_STOPACQUISITION:
-            pass
-
-        elif param[0] == CMD_ASICLOAD:
-            self.e_read_Vreset.setText(str(hex(int(param[1])))[2:6])
-            self.e_read_Dsub.setText(str(hex(int(param[2])))[2:6])
-            self.e_read_Vbiasgate.setText(str(hex(int(param[3])))[2:6])
-            self.e_read_Vrefmain.setText(str(hex(int(param[4])))[2:6])
-
-        elif param[0] == CMD_WRITEASICREG:
-            _addr = str(hex(int(param[1])))[2:6]
-
-            if _addr == self.e_addr_Vreset.text():
-                self.read_addr(self.e_addr_Vreset.text())
-            elif _addr == self.e_addr_Dsub.text():
-                self.read_addr(self.e_addr_Dsub.text())
-            elif _addr == self.e_addr_Vbiasgate.text():
-                self.read_addr(self.e_addr_Vbiasgate.text())
-            elif _addr == self.e_addr_Vrefmain.text():
-                self.read_addr(self.e_addr_Vrefmain.text())
-            elif _addr == self.e_addr_input.text():
-                self.read_addr(self.e_read_input.text())
-
-        elif param[0] == CMD_READASICREG:
-            _addr = str(hex(int(param[1])))[2:6]
-            _text = str(hex(int(param[2])))[2:6]
             
-            if _addr == self.e_addr_Vreset.text():
-                self.e_read_Vreset.setText(_text)
-            elif _addr == self.e_addr_Dsub.text():
-                self.e_read_Dsub.setText(_text)
-            elif _addr == self.e_addr_Vbiasgate.text():
-                self.e_read_Vbiasgate.setText(_text)
-            elif _addr == self.e_addr_Vrefmain.text():
-                self.e_read_Vrefmain.setText(_text)
+            elif param[0] == CMD_INITIALIZE2:
+                self.QWidgetBtnColor(self.btn_initialize2, "black")
+
+            elif param[0] == CMD_RESET:
+                self.QWidgetBtnColor(self.btn_reset, "black")
+
+            #elif param[0] == CMD_DOWNLOAD:
+            #    pass
+            #elif param[0] == CMD_SETDETECTOR:
+            #    pass
+            #elif param[0] == CMD_ERRCOUNT:
+            #    self.read_addr(self.e_addr_Vreset.text())
+            #    self.read_addr(self.e_addr_Dsub.text())
+            #    self.read_addr(self.e_addr_Vbiasgate.text())
+            #    self.read_addr(self.e_addr_Vrefmain.text())
+
+            #elif param[0] == CMD_SETRAMPPARAM:
+            #    self.acquireramp()  
+
+            #elif param[0] == CMD_SETFSPARAM:
+            #    self.acquireramp()         
+
+            elif param[0] == CMD_ACQUIRERAMP:
+
+                self.QWidgetBtnColor(self.btn_acquireramp, "black")
+
+                self.prog_timer.stop()
+                self.cur_prog_step = 100
+                self.prog_sts.setValue(self.cur_prog_step)
+
+                self.elapsed_timer.stop()
+
+                self.fitsfullpath = param[2]
+
+                show_cur_cnt = "%d / %s" % (self.cur_cnt, self.e_repeat.text())
+                self.label_cur_num.setText(show_cur_cnt)
+
+                if self.cur_cnt < int(self.e_repeat.text()):
+                    #self.acquireramp()
+                    #ti.sleep(0.5)
+                    self.btn_acquireramp.click()
+                else:
+                    self.cur_cnt = 0
+
+                self.label_measured_time.setText(param[1])
+
+                if self.chk_show_fits.isChecked():
+                    ds9 = WORKING_DIR + 'DCS/ds9'
+                    subprocess.Popen([ds9, self.fitsfullpath])
+
+                if self.chk_autosave.isChecked():
+                    file = param[2].split("/")
+                    #path = ""
+                    #for i in file[1:-1]:
+                    #    path += "/"
+                    #    path += i
+                    #self.e_user_dir.setText(path)
+                    self.e_user_file.setText(file[-1][:-5] + "_")
+                        
+
+            elif param[0] == CMD_STOPACQUISITION:
+                pass
+
+            elif param[0] == CMD_ASICLOAD:
+                self.e_read_Vreset.setText(str(hex(int(param[1])))[2:6])
+                self.e_read_Dsub.setText(str(hex(int(param[2])))[2:6])
+                self.e_read_Vbiasgate.setText(str(hex(int(param[3])))[2:6])
+                self.e_read_Vrefmain.setText(str(hex(int(param[4])))[2:6])
+
+            elif param[0] == CMD_WRITEASICREG:
+                _addr = str(hex(int(param[1])))[2:6]
+
+                if _addr == self.e_addr_Vreset.text():
+                    self.read_addr(self.e_addr_Vreset.text())
+                elif _addr == self.e_addr_Dsub.text():
+                    self.read_addr(self.e_addr_Dsub.text())
+                elif _addr == self.e_addr_Vbiasgate.text():
+                    self.read_addr(self.e_addr_Vbiasgate.text())
+                elif _addr == self.e_addr_Vrefmain.text():
+                    self.read_addr(self.e_addr_Vrefmain.text())
+                elif _addr == self.e_addr_input.text():
+                    self.read_addr(self.e_read_input.text())
+
+            elif param[0] == CMD_READASICREG:
+                _addr = str(hex(int(param[1])))[2:6]
+                _text = str(hex(int(param[2])))[2:6]
+                
+                if _addr == self.e_addr_Vreset.text():
+                    self.e_read_Vreset.setText(_text)
+                elif _addr == self.e_addr_Dsub.text():
+                    self.e_read_Dsub.setText(_text)
+                elif _addr == self.e_addr_Vbiasgate.text():
+                    self.e_read_Vbiasgate.setText(_text)
+                elif _addr == self.e_addr_Vrefmain.text():
+                    self.e_read_Vrefmain.setText(_text)
+                else:
+                    self.e_read_input.setText(_text)
+
+            elif param[0] == CMD_GETTELEMETRY:
+                pass
             else:
-                self.e_read_input.setText(_text)
+                pass
 
-        elif param[0] == CMD_GETTELEMETRY:
-            pass
-        else:
-            pass
-
-        self.param = ""
+            self.param = ""
+            
+        except:
+            self.log.send(self.iam, WARNING, "parsing error")
     
 
 

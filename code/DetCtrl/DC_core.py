@@ -303,49 +303,53 @@ class DC(threading.Thread):
         if len(param) < 3:
             return
 
-        if param[0] == CMD_STOPACQUISITION:
-            self.stop = True
-            #print("received 'stop'!!!!!!")
-        elif param[0] == OBSAPP_BUSY:
-            self.stop = True
+        try:
+            if param[0] == CMD_STOPACQUISITION:
+                self.stop = True
+                #print("received 'stop'!!!!!!")
+            elif param[0] == OBSAPP_BUSY:
+                self.stop = True
 
-        if self.acquiring:
-            return
+            if self.acquiring:
+                return
 
-        if IAM == "DCSS" and param[1] == "H_K":
-            return    
-        if not (param[1] == IAM or param[1] == "all"):
-            return
+            if IAM == "DCSS" and param[1] == "H_K":
+                return    
+            if not (param[1] == IAM or param[1] == "all"):
+                return
 
-        msg = "<- [%s] %s" % (cmd, where)
-        self.log.send(IAM, INFO, msg)
+            msg = "<- [%s] %s" % (cmd, where)
+            self.log.send(IAM, INFO, msg)
 
-        # simulation mode
-        if bool(int(param[2])):
-            if param[0] == CMD_INIT2_DONE or param[0] == CMD_INITIALIZE2_ICS or param[0]  == CMD_SETFSPARAM_ICS:
-                self.publish_to_ics_queue(param[0])
-                #print("Answer!!!")
-            elif param[0] == CMD_ACQUIRERAMP_ICS:                
-                ti.sleep(2)
+            # simulation mode
+            if bool(int(param[2])):
+                if param[0] == CMD_INIT2_DONE or param[0] == CMD_INITIALIZE2_ICS or param[0]  == CMD_SETFSPARAM_ICS:
+                    self.publish_to_ics_queue(param[0])
+                    #print("Answer!!!")
+                elif param[0] == CMD_ACQUIRERAMP_ICS:                
+                    ti.sleep(2)
 
-                _t = datetime.datetime.utcnow()
-                cur_datetime = [_t.year, _t.month, _t.day, _t.hour, _t.minute, _t.second, _t.microsecond]
-                folder_name = "SDC%s_%04d%02d%02d_%04d" % (IAM[-1], cur_datetime[0], cur_datetime[1], cur_datetime[2], self.temp_number)
+                    _t = datetime.datetime.utcnow()
+                    cur_datetime = [_t.year, _t.month, _t.day, _t.hour, _t.minute, _t.second, _t.microsecond]
+                    folder_name = "SDC%s_%04d%02d%02d_%04d" % (IAM[-1], cur_datetime[0], cur_datetime[1], cur_datetime[2], self.temp_number)
 
-                msg = "%s 5 %s" % (param[0], folder_name)
-                self.publish_to_ics_queue(msg)
-            
-                msg = "%s ->" % msg
-                self.log.send(IAM, INFO, msg)
+                    msg = "%s 5 %s" % (param[0], folder_name)
+                    self.publish_to_ics_queue(msg)
                 
-                self.temp_number += 1
+                    msg = "%s ->" % msg
+                    self.log.send(IAM, INFO, msg)
+                    
+                    self.temp_number += 1
 
-            elif param[0] == CMD_STOPACQUISITION:
-                self.publish_to_ics_queue(param[0])
-            
-        else:
-            if self.init1:
-                self.param = cmd
+                elif param[0] == CMD_STOPACQUISITION:
+                    self.publish_to_ics_queue(param[0])
+                
+            else:
+                if self.init1:
+                    self.param = cmd
+                    
+        except:
+            self.log.send(self.iam, WARNING, "parsing error")
        
 
 
@@ -371,13 +375,17 @@ class DC(threading.Thread):
         msg = "<- [DB uploader] %s" % cmd
         self.log.send(self._iam, INFO, msg)
 
-        if param[0] == UPLOAD_Q:
-            dewar_list = param[1:]
-            if len(dewar_list) != len(FieldNames):
-                return None
+        try:
+            if param[0] == UPLOAD_Q:
+                dewar_list = param[1:]
+                if len(dewar_list) != len(FieldNames):
+                    return None
 
-            self.dewar_dict = dict((k, t(v)) for (k, t), v in zip(FieldNames, dewar_list))
-            self.dewar_info = True
+                self.dewar_dict = dict((k, t(v)) for (k, t), v in zip(FieldNames, dewar_list))
+                self.dewar_info = True
+                
+        except:
+            self.log.send(self.iam, WARNING, "parsing error")
         
 
     #+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -416,35 +424,40 @@ class DC(threading.Thread):
         self.param = cmd
 
         param = self.param.split()
-        if param[0] == CMD_VERSION:
-            if self.init1:
-                msg = "%s %s %d 1" % (CMD_VERSION, self.LibVersion(), self.pCard[self.slctCard].contents.macieSerialNumber)
-                #msg = "%s %s %d 1" % (CMD_VERSION, self.LibVersion(), self.macieSN)
-            else:
-                msg = "%s %s --- 0" % (CMD_VERSION, self.LibVersion())
-
-            self.publish_to_local_queue(msg)
-            
-
-        #elif param[0] == CMD_SHOWFITS:
-        #    self.showfits = bool(int(param[1]))
-            
-        #elif param[0] == CMD_EXIT:
-        #    self.__del__()
-
-        elif param[0] == CMD_SETFSMODE:
-            self.samplingMode = int(param[1]) 
-            #self.log.send(IAM, INFO, param[1])
-
-        elif param[0] == CMD_SETWINPARAM:
-            self.x_start = int(param[1])
-            self.x_stop = int(param[2])
-            self.y_start = int(param[3])
-            self.y_stop = int(param[4])
         
-        elif param[0] == CMD_STOPACQUISITION:
-            self.stop = True
-            #self.publish_to_local_queue(CMD_STOPACQUISITION)
+        try:
+            if param[0] == CMD_VERSION:
+                if self.init1:
+                    msg = "%s %s %d 1" % (CMD_VERSION, self.LibVersion(), self.pCard[self.slctCard].contents.macieSerialNumber)
+                    #msg = "%s %s %d 1" % (CMD_VERSION, self.LibVersion(), self.macieSN)
+                else:
+                    msg = "%s %s --- 0" % (CMD_VERSION, self.LibVersion())
+
+                self.publish_to_local_queue(msg)
+                
+
+            #elif param[0] == CMD_SHOWFITS:
+            #    self.showfits = bool(int(param[1]))
+                
+            #elif param[0] == CMD_EXIT:
+            #    self.__del__()
+
+            elif param[0] == CMD_SETFSMODE:
+                self.samplingMode = int(param[1]) 
+                #self.log.send(IAM, INFO, param[1])
+
+            elif param[0] == CMD_SETWINPARAM:
+                self.x_start = int(param[1])
+                self.x_stop = int(param[2])
+                self.y_start = int(param[3])
+                self.y_stop = int(param[4])
+            
+            elif param[0] == CMD_STOPACQUISITION:
+                self.stop = True
+                #self.publish_to_local_queue(CMD_STOPACQUISITION)
+            
+        except:
+            self.log.send(self.iam, WARNING, "parsing error")
 
 
     def control_MACIE(self):

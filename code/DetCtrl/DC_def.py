@@ -23,7 +23,7 @@ except:
     IAM = user.upper()
 
 #FUN_OK = 1
-#IAM = "DCSS"
+IAM = "DCSS"
 FITS_HDR_CNT = 50
 
 FieldNames = [('date', str), ('time', str),
