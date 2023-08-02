@@ -1,0 +1,136 @@
+export LD_LIBRARY_PATH=$HOME/macie_v5.3_centos/MacieApp/
+export PATH=$PATH:$HOME/macie_v5.3_centos/MacieApp/
+
+
+(base) [dcsk@localhost examplecode]$ g++ TestLibCpp_Linux.cpp ../MacieApp/libMACIE.so -o TestLibCpp
+
+(base) [dcsk@localhost examplecode]$ ./TestLibCpp
+start test C++
+
+Enter an option, -1 to end: 1
+MACIE_LibVersion = 5.3
+Check Interface....
+MACIE_CheckInterfaces succeeded
+numCards= 3
+macieSerialNumber=50
+bUART=false
+bGigE=true
+bUSB=false
+ipAddr=192.168.1.102
+gigeSpeed=1000
+serialPortName=none
+
+usbSerialNumber=
+USBSpeed=0
+Firmware 2=macie_sidecar_01_22_20_v1.8.bit
+macieSerialNumber=73
+bUART=false
+bGigE=true
+bUSB=false
+ipAddr=192.168.1.101
+gigeSpeed=1000
+serialPortName=none
+
+usbSerialNumber=
+USBSpeed=0
+Firmware 2=macie_sidecar_01_22_20_v1.8.bit
+macieSerialNumber=26
+bUART=false
+bGigE=true
+bUSB=false
+ipAddr=192.168.1.100
+gigeSpeed=1000
+serialPortName=none
+
+usbSerialNumber=
+USBSpeed=0
+Firmware 2=macie_sidecar_08_23_18_v1.5.bit
+
+Enter an option, -1 to end: 20
+Get handle for the interface of MACIE 73, GigE connection 
+ Handle = 4784130
+
+Enter an option, -1 to end: 30
+Get available MACIE cards...
+MACIE_GetAvailableMACIEs= 1
+MACIE h0300=2
+
+Enter an option, -1 to end: 40
+Initialize with handle  4784130
+Load MACIE firmware succeeded
+Download MACIE register file succeeded
+ val = 3300
+ val = 704
+ val = 4095
+ val = 4095
+ val = 4095
+Reset error counters succeeded
+Download ASIC firmware succeeded
+Reset error counters succeeded
+GetAvailableASICs failed checking SIDECAR8 reg readback
+Available ASICs=1
+Initialization succeeded 
+ASIC h6100=17666
+val=0
+val=1
+val=12
+val=1
+val=1
+
+Enter an option, -1 to end: 50
+Acquire Science Data...
+Configuration succeeded
+Science interface configuration succeeded. buf (KB) = 268000
+Trigger image acquisition... 
+ Triggering succeeded
+Wait....
+After trigering: available science data = 20000 bytes, Loop = 1
+Null frame 
+
+Enter an option, -1 to end: 53
+Acquire Science Data...
+Configuration succeeded
+Science interface configuration succeeded. buf (KB) = 268000
+Trigger image acquisition... 
+ Triggering succeeded
+Wait....
+Wait....
+Wait....
+Available science data = 126976 bytes, Loop = 3
+Write Fits file now...
+testImage0.fits
+Write Fits file now...
+testImage1.fits
+Write Fits file now...
+testImage2.fits
+Write Fits file now...
+testImage3.fits
+Write Fits file now...
+testImage4.fits
+Write Fits file now...
+testImage5.fits
+Write Fits file now...
+testImage6.fits
+Write Fits file now...
+testImage7.fits
+Write Fits file now...
+testImage8.fits
+Write Fits file now...
+testImage9.fits
+Write Fits file now...
+testImage10.fits
+Write Fits file now...
+testImage11.fits
+Write Fits file now...
+testImage12.fits
+Write Fits file now...
+testImage13.fits
+Write Fits file now...
+testImage14.fits
+Succeeded
+
+Enter an option, -1 to end: -1
+Test done 
+
+
+

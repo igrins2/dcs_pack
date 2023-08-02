@@ -24,7 +24,7 @@ except:
 
 #FUN_OK = 1
 #IAM = "DCSS"
-FITS_HDR_CNT = 50
+FITS_HDR_CNT = 100
 
 FieldNames = [('date', str), ('time', str),
               ('pressure', float),
