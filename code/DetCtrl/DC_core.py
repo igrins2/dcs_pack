@@ -143,9 +143,13 @@ class DC(threading.Thread):
         self.expTime = 0.0
         self.fowlerTime = 0.0
 
-        self.preampInputScheme =  1    # 2
-        self.preampInputVal = 0x4502    # 0xaaaa
-        self.preampGain = 8
+        self.output = 32
+
+        #for test
+        self.preampInputScheme = int(cfg.get("DC", 'preampInputScheme'))   #1
+        val = cfg.get("DC", 'preampInputVal')
+        self.preampInputVal = int("0x" + val, 16)   #0x4502    # 0xaaaa
+        self.preampGain = int(cfg.get("DC", 'preampGain'))   #8
 
         # hardware addr
         self.V_reset_addr = hex(int(0))
@@ -208,6 +212,7 @@ class DC(threading.Thread):
         self.connect_to_server_q()
 
         threading.Thread(target=self.control_MACIE).start()
+        #self.control_MACIE()
 
 
     def __del__(self):
@@ -479,6 +484,7 @@ class DC(threading.Thread):
                     self.publish_to_local_queue(msg)
 
             elif param[0] == CMD_INITIALIZE2:
+                self.output = int(param[1])
                 self.macie_file = param[2]
                 self.asic_file = param[3]
                 if self.Initialize2() == False:
@@ -487,13 +493,14 @@ class DC(threading.Thread):
                     continue
                 if self.DownloadMCD() == False:
                     continue
-                if self.SetDetector(MUX_TYPE, int(param[1])):
+                if self.SetDetector(MUX_TYPE, self.output):
                     self.publish_to_local_queue(CMD_INITIALIZE2)
 
                 self.load_ASIC()
 
             elif param[0] == CMD_SETDETECTOR:
-                if self.SetDetector(MUX_TYPE, int(param[1])):
+                self.output = int(param[1])
+                if self.SetDetector(MUX_TYPE, self.output):
                     pass
 
             elif param[0] == CMD_RESET:
@@ -969,6 +976,8 @@ class DC(threading.Thread):
 
 
     def SetDetector(self, muxType, outputs):  # muxType = 2 (H2RG)
+        #return True
+        
         if self.handle == 0:
             return False
 
@@ -1009,6 +1018,10 @@ class DC(threading.Thread):
 
 
     def SetRampParam(self, p1, p2, p3, p4, p5):  # p1~p5 : int
+        
+        #if self.output == 1:
+        #return True
+        
         if self.handle == 0:
             return False
 
@@ -1108,9 +1121,15 @@ class DC(threading.Thread):
         # step 1. ASIC configuration
         res = [0 for _ in range(7)]
 
-        res[0] = lib.MACIE_WriteASICReg(self.handle, self.slctASICs, ASICAddr_ASICInputRefVal, self.preampInputScheme, self.option)
-        res[1] = lib.MACIE_WriteASICReg(self.handle, self.slctASICs, ASICAddr_PreAmpReg1Ch1ENAddr, self.preampInputVal, self.option)
-        res[2] = lib.MACIE_WriteASICReg(self.handle, self.slctASICs, ASICAddr_ASICPreAmpGainVal, self.preampGain, self.option)
+        preampInputScheme = self.preampInputScheme
+        preampInputVal = self.preampInputVal
+        preampGain = self.preampGain
+        
+        #print(preampInputScheme, preampGain)
+
+        res[0] = lib.MACIE_WriteASICReg(self.handle, self.slctASICs, ASICAddr_ASICInputRefVal, preampInputScheme, self.option)
+        res[1] = lib.MACIE_WriteASICReg(self.handle, self.slctASICs, ASICAddr_PreAmpReg1Ch1ENAddr, preampInputVal, self.option)
+        res[2] = lib.MACIE_WriteASICReg(self.handle, self.slctASICs, ASICAddr_ASICPreAmpGainVal, preampGain, self.option)
         res[3] = lib.MACIE_WriteASICReg(self.handle, self.slctASICs, ASICAddr_NReads, self.reads, self.option)
         res[4] = lib.MACIE_WriteASICReg(self.handle, self.slctASICs, ASICAddr_NRamps, self.ramps, self.option)
 
@@ -1188,11 +1207,23 @@ class DC(threading.Thread):
         self.log.send(self._iam, INFO, "Acquire Science Data....")
 
         # step 1. ASIC configuration
-        res = [0 for _ in range(7)]
+        res = [0 for _ in range(10)]
 
-        res[0] = lib.MACIE_WriteASICReg(self.handle, self.slctASICs, ASICAddr_ASICInputRefVal, self.preampInputScheme, self.option)
-        res[1] = lib.MACIE_WriteASICReg(self.handle, self.slctASICs, ASICAddr_PreAmpReg1Ch1ENAddr, self.preampInputVal, self.option)
-        res[2] = lib.MACIE_WriteASICReg(self.handle, self.slctASICs, ASICAddr_ASICPreAmpGainVal, self.preampGain, self.option)
+        #preampInputScheme = 2
+        #preampInputVal = 0xaaaa #0x4502 #0xaaaa
+        #preampGain = 1
+        
+        cfg = sc.LoadConfig(WORKING_DIR + "DCS/DCS.ini")
+        preampInputScheme = int(cfg.get("DC", 'preampInputScheme'))   #1
+        val = cfg.get("DC", 'preampInputVal')
+        preampInputVal = int("0x" + val, 16)   #0x4502    # 0xaaaa
+        preampGain = int(cfg.get("DC", 'preampGain'))   #8
+
+        print(preampInputScheme, preampInputVal, preampGain)
+        
+        res[0] = lib.MACIE_WriteASICReg(self.handle, self.slctASICs, ASICAddr_ASICInputRefVal, preampInputScheme, self.option)
+        res[1] = lib.MACIE_WriteASICReg(self.handle, self.slctASICs, ASICAddr_PreAmpReg1Ch1ENAddr, preampInputVal, self.option)
+        res[2] = lib.MACIE_WriteASICReg(self.handle, self.slctASICs, ASICAddr_ASICPreAmpGainVal, preampGain, self.option)
         res[3] = lib.MACIE_WriteASICReg(self.handle, self.slctASICs, ASICAddr_NReads, 1, self.option)
 
         if self.samplingMode == UTR_MODE:
@@ -1205,11 +1236,16 @@ class DC(threading.Thread):
         arr_list = [self.x_start, self.x_stop, self.y_start, self.y_stop] # x1, x2, y1, y2
         arr = np.array(arr_list)
         winarr = arr.ctypes.data_as(POINTER(c_uint))
-        res[5] = lib.MACIE_WriteASICBlock(self.handle, self.slctASICs, ASICAddr_WinArr, winarr, 4, self.option)
+        #res[5] = lib.MACIE_WriteASICBlock(self.handle, self.slctASICs, ASICAddr_WinArr, winarr, 4, self.option)
 
-        res[6] = lib.MACIE_WriteASICReg(self.handle, self.slctASICs, ASICAddr_State, 0x8002, self.option)
+        res[5] = lib.MACIE_WriteASICReg(self.handle, self.slctASICs, ASICAddr_WinArr[0], self.x_start, self.option)
+        res[6] = lib.MACIE_WriteASICReg(self.handle, self.slctASICs, ASICAddr_WinArr[1], self.x_stop, self.option)
+        res[7] = lib.MACIE_WriteASICReg(self.handle, self.slctASICs, ASICAddr_WinArr[2], self.y_start, self.option)
+        res[8] = lib.MACIE_WriteASICReg(self.handle, self.slctASICs, ASICAddr_WinArr[3], self.y_stop, self.option)
 
-        for i in range(7):
+        res[9] = lib.MACIE_WriteASICReg(self.handle, self.slctASICs, ASICAddr_State, 0x8002, self.option)
+
+        for i in range(10):
             if res[i] != MACIE_OK:
                 self.log.send(self._iam, ERROR, "ASIC configuration failed - write ASIC registers")
                 return False
@@ -1253,9 +1289,9 @@ class DC(threading.Thread):
             return False
 
         
-        if lib.MACIE_WriteASICReg(self.handle, self.slctASICs, ASICAddr_NReads, 1, self.option) != MACIE_OK:
-            self.log.send(self._iam, ERROR, "write ASIC h4001 " + RET_FAIL)
-            return False
+        #if lib.MACIE_WriteASICReg(self.handle, self.slctASICs, ASICAddr_NReads, 1, self.option) != MACIE_OK:
+        #    self.log.send(self._iam, ERROR, "write ASIC h4001 " + RET_FAIL)
+        #    return False
 
 
         if lib.MACIE_WriteASICReg(self.handle, self.slctASICs, ASICAddr_State, 0x8001, self.option) != MACIE_OK:
@@ -1337,6 +1373,7 @@ class DC(threading.Thread):
         self.loadimg = []
         for i in range(frame_cnt):
             self.loadimg.append(data[start*i:start*(i+1)])
+        #print(self.loadimg)
 
         lib.MACIE_CloseGigeScienceInterface(self.handle, self.slctMACIEs)
         
@@ -1350,17 +1387,16 @@ class DC(threading.Thread):
             return False
 
         #getByte, frameSize = 0, 0
-        #frameSize = (self.x_stop - self.x_start + 1) * (self.y_stop - self.y_start + 1)
-        #getByte = frameSize * 2
+        frameSize = (self.x_stop - self.x_start + 1) * (self.y_stop - self.y_start + 1)
+        getByte = frameSize * 2
 
         reset, idleReset, moreDelay = 1, 1, 4000
         triggerTimeout = (T_frame * 1000) * (reset+idleReset) + moreDelay
         msg = "triggerTimeout 1: %.3f" % triggerTimeout
         self.log.send(self._iam, DEBUG, msg)
 
-        #ti.sleep(0.2)
+        ti.sleep(0.2)
 
-        byte = 0        
         for i in range(20):
             byte = lib.MACIE_AvailableScienceData(self.handle)
             if byte >= getByte:
@@ -1371,26 +1407,24 @@ class DC(threading.Thread):
                 print(msg)
                 break
             self.log.send(self._iam, INFO, "Wait (ROI)....")
-            ti.sleep(triggerTimeout / 20 / 1000)
+            ti.sleep(triggerTimeout / 1000 / 10)
 
         if byte <= 0:
             self.log.send(self._iam, WARNING, "Trigger timeout: no available science data")
             return False
 
-        #data = None
         arr_list = []
         arr = np.array(arr_list)
         data = arr.ctypes.data_as(POINTER(c_ushort))
-        
-        #for i in range(15):
         data = lib.MACIE_ReadGigeScienceFrame(self.handle, int(1500 + 5000))
-            
+
         if data == None:
             self.log.send(self._iam, WARNING, "Null frame (ROI)")
             return False
 
-        #self.loadimg.append(data[0:frameSize])
-        self.loadimg = data
+        self.loadimg = []
+        self.loadimg.append(data[0:frameSize])
+        #print(self.loadimg)
 
         lib.MACIE_CloseGigeScienceInterface(self.handle, self.slctMACIEs) 
 
@@ -1868,9 +1902,9 @@ class DC(threading.Thread):
             header_cnt += 1
 
             if self.ROIMode:
-                #arr = np.array(self.loadimg[idx], dtype=np.int16)
-                #data = arr.ctypes.data_as(POINTER(c_ushort))
-                sts = lib.MACIE_WriteFitsFile(c_char_p(filename.encode()), self.x_stop - self.x_start + 1, self.y_stop - self.y_start + 1, self.loadimg, header_cnt, pHeaders)
+                arr = np.array(self.loadimg[idx], dtype=np.int16)
+                data = arr.ctypes.data_as(POINTER(c_ushort))
+                sts = lib.MACIE_WriteFitsFile(c_char_p(filename.encode()), self.x_stop - self.x_start + 1, self.y_stop - self.y_start + 1, data, header_cnt, pHeaders)
             else:
                 arr = np.array(self.loadimg[idx], dtype=np.int16)
                 data = arr.ctypes.data_as(POINTER(c_ushort))

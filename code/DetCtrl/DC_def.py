@@ -23,7 +23,7 @@ except:
     IAM = user.upper()
 
 #FUN_OK = 1
-IAM = "DCSS"
+#IAM = "DCSS"
 FITS_HDR_CNT = 50
 
 FieldNames = [('date', str), ('time', str),
@@ -107,7 +107,7 @@ ASICAddr_HxRGNumOutVal = 0x4011
 ASICAddr_HxRGExpModeVal = 0x4018    #exposure mode
 ASICAddr_ASICInputRefVal = 0x4019
 ASICAddr_ASICPreAmpGainVal = 0x401a
-ASICAddr_WinArr = 0x4020
+ASICAddr_WinArr = [0x4020, 0x4021, 0x4022, 0x4023]
 
 ASICAddr_PreAmpReg1Ch1ENAddr = 0x5100
 
