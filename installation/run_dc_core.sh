@@ -3,7 +3,7 @@
 sysctl -w net.core.rmem_max="134000000"
 #firewall-cmd --zone=trusted --change-interface=ens160
 
-HOME=/home/dcss
+HOME=/home/ics
 
 export LD_LIBRARY_PATH=$HOME/macie_v5.3_centos/MacieApp/
 export PATH=$PATH:$HOME/macie_v5.3_centos/MacieApp/

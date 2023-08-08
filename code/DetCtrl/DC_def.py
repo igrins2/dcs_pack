@@ -23,7 +23,7 @@ except:
     IAM = user.upper()
 
 #FUN_OK = 1
-#IAM = "DCSS"
+IAM = "DCSS"
 FITS_HDR_CNT = 100
 
 FieldNames = [('date', str), ('time', str),
@@ -83,9 +83,10 @@ CDSNOISE_MODE = 2
 FOWLER_MODE = 3
 
 T_frame = 1.45479
-T_exp = 1.63
+T_exp = 1.623
 T_minFowler = 0.168
 T_br = 2
+N_fowler_max = 16
 
 MACIE_Reg = 0x0300
 MACIE_Block_Reg = 0x321
@@ -120,7 +121,7 @@ OBSAPP_BUSY = "ObsAppBusy"
 
 CMD_SIMULATION = "Simulation"
 CMD_VERSION = "LibVersion"
-CMD_EXIT = "Exit"
+#CMD_EXIT = "Exit"
 
 CMD_INITIALIZE1 = "Initialize1"
 CMD_INITIALIZE2 = "Initialize2"

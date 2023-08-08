@@ -3,7 +3,7 @@
 """
 Created on Aug 4, 2022
 
-Modified on Dec 15, 2022
+Modified on Aug 4, 2023
 
 @author: hilee
 """
@@ -27,11 +27,13 @@ import subprocess
 import time as ti
 from shutil import copyfile
 
+from distutils.util import strtobool
+
 class MainWindow(Ui_Dialog, QMainWindow):
 
-    def __init__(self, autostart=False):
+    def __init__(self):
         super().__init__()
-
+        
         self.setupUi(self)
         self.setWindowTitle("Detector Control System 2.0")
         self.setFixedSize(921, 641)
@@ -116,9 +118,6 @@ class MainWindow(Ui_Dialog, QMainWindow):
         self.expTime = 1.63
         self.cal_waittime = 0.0        
 
-        self.radio_exp_time.setChecked(True)
-        self.radio_fowler_number.setChecked(False)
-
         self.chk_autosave.setText("Save AS")
         self.chk_autosave.setChecked(False)
 
@@ -150,7 +149,7 @@ class MainWindow(Ui_Dialog, QMainWindow):
 
         self.log.send(self._iam, INFO, "DCS gui closing...")
 
-        self.publish_to_queue(CMD_EXIT)
+        #self.publish_to_queue(CMD_EXIT)
 
         for th in threading.enumerate():
             self.log.send(self._iam, INFO, th.name + " exit.")
@@ -216,30 +215,28 @@ class MainWindow(Ui_Dialog, QMainWindow):
         self.busy = False        
     
         try: 
+            #if param[0] == CMD_EXIT:
+            #    self.initialized(False)
+
             if param[0] == CMD_VERSION:
                 if bool(int(param[3])):
                     info = "%s (%s)" % (param[1], param[2])
                     self.label_ver.setText(info)
-
-                    self.QWidgetBtnColor(self.btn_initialize1, "white", "green") 
-                    self.btn_initialize1.setEnabled(False)
-                    self.e_timeout.setEnabled(False)
+                    self.initialized(True)
 
                 else:
                     self.label_ver.setText(param[1])
-
-                    self.QWidgetBtnColor(self.btn_initialize1, "black") 
-                    self.btn_initialize1.setEnabled(True)
-                    self.e_timeout.setEnabled(True)
+                    self.initialized(False)
             
             elif param[0] == CMD_INITIALIZE1:          
-                self.QWidgetBtnColor(self.btn_initialize1, "white", "green") 
-
-                info = "%s (%s)" % (param[1], param[2])
+                if param[2] == '0':
+                    self.initialized(False)
+                    info = "%s" % param[1]
+                else:
+                    self.initialized(True)
+                    info = "%s (%s)" % (param[1], param[2])
+                    
                 self.label_ver.setText(info)
-
-                self.btn_initialize1.setEnabled(False)
-                self.e_timeout.setEnabled(False)
             
             elif param[0] == CMD_INITIALIZE2:
                 self.QWidgetBtnColor(self.btn_initialize2, "black")
@@ -347,7 +344,7 @@ class MainWindow(Ui_Dialog, QMainWindow):
             self.param = ""
             
         except:
-            self.log.send(self.iam, WARNING, "parsing error")
+            self.log.send(self._iam, WARNING, "parsing error")
     
 
 
@@ -357,9 +354,6 @@ class MainWindow(Ui_Dialog, QMainWindow):
             self.e_groups.setEnabled(True)
             self.e_drops.setEnabled(True)
             self.e_ramps.setEnabled(True)
-
-            self.radio_exp_time.hide()
-            self.radio_fowler_number.hide()
 
             self.e_exp_time.setEnabled(False)
             self.e_fowler_number.setEnabled(False)
@@ -378,16 +372,10 @@ class MainWindow(Ui_Dialog, QMainWindow):
 
             if self.samplingMode == FOWLER_MODE:
                 self.e_exp_time.setEnabled(True)
-                self.e_fowler_number.setEnabled(False)
-                self.radio_exp_time.show()
-                self.radio_fowler_number.show()
-            
+                self.e_fowler_number.setEnabled(True)            
             else:
                 self.e_exp_time.setEnabled(False)
                 self.e_fowler_number.setEnabled(False)
-
-                self.radio_exp_time.hide()
-                self.radio_fowler_number.hide()
 
         self.e_resets.setText(str(resets))
         self.e_reads.setText(str(reads))
@@ -411,10 +399,8 @@ class MainWindow(Ui_Dialog, QMainWindow):
         self.radio_CDSNoise.clicked.connect(self.click_CDSNoise)
         self.radio_Fowler.clicked.connect(self.click_Fowler)
 
-        self.radio_exp_time.clicked.connect(self.judge_exp_time)
-        self.radio_fowler_number.clicked.connect(self.judge_fowler_number)
-
-        #self.e_fowler_number.returnPressed.connect(self.judge_param)
+        self.e_exp_time.editingFinished.connect(self.judge_param)
+        self.e_fowler_number.editingFinished.connect(self.judge_limit)
 
         #self.btn_set_param.clicked.connect(self.set_parameter)
 
@@ -478,6 +464,16 @@ class MainWindow(Ui_Dialog, QMainWindow):
         msg = "%s %s" % (CMD_SETDETECTOR, self.cmb_ouput_channels.currentText())
         self.publish_to_queue(msg)
             
+            
+    def initialized(self, res=True):
+        if res:
+            self.QWidgetBtnColor(self.btn_initialize1, "white", "green") 
+            #self.btn_initialize1.setEnabled(False)
+            self.e_timeout.setEnabled(False)
+        else:
+            self.QWidgetBtnColor(self.btn_initialize1, "black") 
+            #self.btn_initialize1.setEnabled(True)
+            self.e_timeout.setEnabled(True)
             
 
     def initialize1(self):
@@ -566,50 +562,45 @@ class MainWindow(Ui_Dialog, QMainWindow):
         self.set_param_ui(1, 1, 1, T_minFowler, 1)
 
 
-    def judge_exp_time(self):
-        #self.radio_exp_time.setChecked(True)
-        self.radio_fowler_number.setChecked(False)
-        self.e_exp_time.setEnabled(True)
-        self.e_fowler_number.setEnabled(False)
-
-        #self.judge_param()
-
-
-    def judge_fowler_number(self):
-        self.radio_exp_time.setChecked(False)
-        #self.radio_fowler_number.setChecked(True)
-        self.e_exp_time.setEnabled(False)
-        self.e_fowler_number.setEnabled(True)
-
 
     def judge_param(self):
         # calculation fowler number & exp time
-        self.expTime = float(self.e_exp_time.text())
-        _fowler_num = int(self.e_fowler_number.text())
+        _expTime = float(self.e_exp_time.text())
 
-        _fowler_time = float(self.e_drops.text())
+        if _expTime < T_exp:
+            msg = "Exp.Time should be more than %.2f." % T_exp
+            QMessageBox.warning(self, WARNING, msg)
+            self.log.send(self._iam, WARNING, msg)
 
-        if self.radio_exp_time.isChecked():
+            self.expTime = T_exp
+            self.fowler_num = 1
+            
+        else:        
+            self.expTime = _expTime
+            
             _max_fowler_number = int((self.expTime - T_minFowler) / T_frame)
-            if _fowler_num > _max_fowler_number:
-                #dialog box
-                QMessageBox.warning(self, WARNING, "please change 'exposure time'!")
-                self.log.send(self._iam, WARNING, "please change 'exposure time'!")
-                return False
+            self.fowler_num = N_fowler_max
+            while self.fowler_num > _max_fowler_number:
+                self.fowler_num //= 2
+                
+        self.e_exp_time.setText(str(self.expTime))
+        self.e_fowler_number.setText(str(self.fowler_num))
 
-        elif self.radio_fowler_number.isChecked():
-            _fowler_time = self.expTime - T_frame * _fowler_num
-            if _fowler_time < T_minFowler:
-                #dialog box
-                QMessageBox.warning(self, WARNING, "please change 'fowler sampling number'!")
-                self.log.send(self._iam, WARNING, "please change 'fowler sampling number'!")
-                return False            
 
-        else:
-            self.log.send(self._iam, WARNING, "Please select 'Exp. Time' or 'N. Fowler' for judgement!")
-            return False
-
-        return True
+    def judge_limit(self):
+        _fowler_num = int(self.e_fowler_number.text())
+        if _fowler_num > self.fowler_num:
+            msg = "N.Fowler should be below %d." % self.fowler_num
+            QMessageBox.warning(self, WARNING, msg)
+            self.log.send(self._iam, WARNING, msg)    
+            
+            self.e_fowler_number.setText(str(self.fowler_num))      
+        
+        self.e_reads.setText(self.e_fowler_number.text())
+        
+        fowlerTime = self.expTime - T_frame * self.fowler_num
+        str_fowlerTime = "%.3f" % fowlerTime
+        self.e_drops.setText(str_fowlerTime)
         
 
     def set_parameter(self):
@@ -617,10 +608,6 @@ class MainWindow(Ui_Dialog, QMainWindow):
         #if self.busy:
         #    return
         #self.busy = True
-
-        if self.samplingMode == FOWLER_MODE and self.judge_param() == False:
-            #self.busy = False
-            return False
 
         resets = int(self.e_resets.text())
         reads = int(self.e_reads.text())
@@ -646,26 +633,19 @@ class MainWindow(Ui_Dialog, QMainWindow):
         else:
             self.expTime = float(self.e_exp_time.text())
             if self.samplingMode == FOWLER_MODE:
-                #if self.radio_fowler_number.isChecked():
-                self.e_reads.setText(self.e_fowler_number.text())
-                reads = int(self.e_reads.text())
-                if self.radio_fowler_number.isChecked():
-                    self.e_reads.setText(self.e_fowler_number.text())
-                    reads = int(self.e_reads.text())
-
+                reads = int(self.e_fowler_number.text())
                 fowlerTime = self.expTime - T_frame * reads
-                str_fowlerTime = "%.3f" % fowlerTime
                 
+                str_fowlerTime = "%.3f" % fowlerTime
                 self.e_drops.setText(str_fowlerTime)
             
             else:
                 fowlerTime = float(self.e_drops.text())
                 self.expTime = fowlerTime + T_frame * reads
-
+                
                 str_exp_time = "%.3f" % self.expTime
                 self.e_exp_time.setText(str_exp_time)
 
-            self.e_reads.setText(self.e_fowler_number.text())
             self.cal_waittime = T_br + ((T_frame * resets) + fowlerTime + (2 * T_frame * reads)) * ramps
   
             msg = "%s %.3f %d %d %d %.3f %d" % (CMD_SETFSPARAM, self.expTime, resets, reads, groups, fowlerTime, ramps)
@@ -893,7 +873,6 @@ class MainWindow(Ui_Dialog, QMainWindow):
 if __name__ == "__main__":
 
     app = QApplication(sys.argv)
-
     dc = MainWindow()
     dc.show()
 

@@ -3,12 +3,13 @@
 """
 Created on Mar 4, 2022
 
-Modified on Aug 02, 2023
+Modified on Aug 8, 2023
 
 @author: hilee
 """
 
 #import subprocess
+from random import triangular
 import numpy as np
 import astropy.io.fits as fits
 from astropy.time import Time
@@ -191,7 +192,7 @@ class DC(threading.Thread):
 
         #self.showfits = False
 
-        self.init1 = False  #for ics
+        self.init1 = False
         self.init2 = False  #for ics
         self.acquiring = False  #prevent conflict
 
@@ -202,7 +203,7 @@ class DC(threading.Thread):
         self.dewar_info = False
 
         self.param = ""
-        self.temp_number = 1    #for simulation mode
+        #self.where = ""
 
         #ti.sleep(2)
 
@@ -230,6 +231,8 @@ class DC(threading.Thread):
         self.MemoryFree()
 
         self.log.send(self._iam, INFO, "DCS core closing...")
+        
+        #self.publish_to_local_queue(CMD_EXIT)
 
         for th in threading.enumerate():
             self.log.send(self._iam, INFO, th.name + " exit.")
@@ -322,6 +325,9 @@ class DC(threading.Thread):
             if param[0] == CMD_STOPACQUISITION:
                 self.stop = True
                 #print("received 'stop'!!!!!!")
+                if bool(int(param[2])):
+                    self.publish_to_ics_queue(param[0])
+                    
             elif param[0] == OBSAPP_BUSY:
                 self.stop = True
 
@@ -336,35 +342,11 @@ class DC(threading.Thread):
             msg = "<- [%s] %s" % (cmd, where)
             self.log.send(IAM, INFO, msg)
 
-            # simulation mode
-            if bool(int(param[2])):
-                if param[0] == CMD_INIT2_DONE or param[0] == CMD_INITIALIZE2_ICS or param[0]  == CMD_SETFSPARAM_ICS:
-                    self.publish_to_ics_queue(param[0])
-                    #print("Answer!!!")
-                elif param[0] == CMD_ACQUIRERAMP_ICS:                
-                    ti.sleep(2)
-
-                    _t = datetime.datetime.utcnow()
-                    cur_datetime = [_t.year, _t.month, _t.day, _t.hour, _t.minute, _t.second, _t.microsecond]
-                    folder_name = "SDC%s_%04d%02d%02d_%04d" % (IAM[-1], cur_datetime[0], cur_datetime[1], cur_datetime[2], self.temp_number)
-
-                    msg = "%s 5 %s" % (param[0], folder_name)
-                    self.publish_to_ics_queue(msg)
-                
-                    msg = "%s ->" % msg
-                    self.log.send(IAM, INFO, msg)
-                    
-                    self.temp_number += 1
-
-                elif param[0] == CMD_STOPACQUISITION:
-                    self.publish_to_ics_queue(param[0])
-                
-            else:
-                if self.init1:
-                    self.param = cmd
+            self.param = cmd
+            #self.where = where
                     
         except:
-            self.log.send(self.iam, WARNING, "parsing error")
+            self.log.send(self._iam, WARNING, "parsing error")
        
 
 
@@ -400,7 +382,7 @@ class DC(threading.Thread):
                 self.dewar_info = True
                 
         except:
-            self.log.send(self.iam, WARNING, "parsing error")
+            self.log.send(self._iam, WARNING, "parsing error")
         
 
     #+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -449,13 +431,6 @@ class DC(threading.Thread):
 
                 self.publish_to_local_queue(msg)
                 
-
-            #elif param[0] == CMD_SHOWFITS:
-            #    self.showfits = bool(int(param[1]))
-                
-            #elif param[0] == CMD_EXIT:
-            #    self.__del__()
-
             elif param[0] == CMD_SETFSMODE:
                 self.samplingMode = int(param[1]) 
                 #self.log.send(IAM, INFO, param[1])
@@ -471,7 +446,7 @@ class DC(threading.Thread):
                 #self.publish_to_local_queue(CMD_STOPACQUISITION)
             
         except:
-            self.log.send(self.iam, WARNING, "parsing error")
+            self.log.send(self._iam, WARNING, "parsing error")
 
 
     def control_MACIE(self):
@@ -489,6 +464,8 @@ class DC(threading.Thread):
             if param[0] == CMD_INITIALIZE1:  
                 if self.Initialize(int(param[1])):
                     msg = "%s %s %d" % (CMD_INITIALIZE1, self.LibVersion(), self.macieSN)
+                else:
+                    msg = "%s %s 0" % (CMD_INITIALIZE1, self.LibVersion())
                     self.publish_to_local_queue(msg)
 
             elif param[0] == CMD_INITIALIZE2:
@@ -496,15 +473,15 @@ class DC(threading.Thread):
                 self.macie_file = param[2]
                 self.asic_file = param[3]
                 if self.Initialize2() == False:
-                    continue
+                    pass
                 if self.ResetASIC() == False:
-                    continue
+                    pass
                 if self.DownloadMCD() == False:
-                    continue
+                    pass
+                if self.load_ASIC() == False:
+                    pass
                 if self.SetDetector(MUX_TYPE, self.output):
-                    self.publish_to_local_queue(CMD_INITIALIZE2)
-
-                self.load_ASIC()
+                    self.publish_to_local_queue(CMD_INITIALIZE2)                
 
             elif param[0] == CMD_SETDETECTOR:
                 self.output = int(param[1])
@@ -529,7 +506,7 @@ class DC(threading.Thread):
                 if param[1] == "0":
                     self.ROIMode = False
                     if self.AcquireRamp() == False:
-                        continue
+                        pass
                     if self.ImageAcquisition():
                         msg = "%s %.3f %s" % (CMD_ACQUIRERAMP, self.measured_durationT, self.full_path)
                         self.publish_to_local_queue(msg)
@@ -602,39 +579,72 @@ class DC(threading.Thread):
             #--------------------------------------------------------         
 
             elif param[0] == CMD_INIT2_DONE or param[0] == CMD_INITIALIZE2_ICS:
-                if self.init2:
+                if bool(int(param[2])):
+                    #for simulation
+                    ti.sleep(3)
                     self.publish_to_ics_queue(param[0])
                 else:
-                    if self.Initialize2() == False:
-                        continue
-                    if self.ResetASIC() == False:
-                        continue
-                    if self.DownloadMCD() == False:
-                        continue
-                    if self.SetDetector(MUX_TYPE, 32):
+                    if self.init2:
                         self.publish_to_ics_queue(param[0])
-
-                    self.load_ASIC()
-
+                    else:
+                        if self.Initialize2() == False:
+                            pass
+                        if self.ResetASIC() == False:
+                            pass
+                        if self.DownloadMCD() == False:
+                            pass
+                        if self.load_ASIC() == False:
+                            pass
+                        if self.SetDetector(MUX_TYPE, 32):
+                            self.publish_to_ics_queue(param[0])
+                        
             elif param[0] == CMD_SETFSPARAM_ICS:
                 self.samplingMode = FOWLER_MODE
                 self.expTime = float(param[3])
                 if self.SetFSParam(int(param[4]), int(param[5]), int(param[6]), float(param[7]), int(param[8])) == False:
-                    continue
+                    pass
                 
                 self.publish_to_ics_queue(param[0])
 
             elif param[0] == CMD_ACQUIRERAMP_ICS:
                 self.next_idx = int(param[3])
                 
-                if self.AcquireRamp() == False:
-                    continue
-                if self.ImageAcquisition():
-                    msg = "%s %.3f %s" % (param[0], self.measured_durationT, self.folder_name)
+                if bool(int(param[2])):
+                    #for simulation
+                    measured_startT = ti.time()    
+                    ti.sleep(self.reads * self.ramps * 2)
+
+                    #copy from demo image
+                    self.fitsfullpath = "SDC%s_demo.fits" % IAM[-1]
+                    frm = fits.open(self.fitsfullpath)[0].data
+                    self.loadimg.append(frm)
+
+                    path = "%s/Data/Fowler/" % self.exe_path
+                    self.createFolder(path)
+                    
+                    _t = datetime.datetime.utcnow()
+                    cur_datetime = [_t.year, _t.month, _t.day, _t.hour, _t.minute, _t.second, _t.microsecond]
+                    folder_name = "%04d%02d%02d" % (_t.year, _t.month, _t.day)
+                    path += folder_name + "/"
+                    self.createFolder(path)
+
+                    filename = "SDC%s_%s_%04d.fits" % (IAM[-1], folder_name, self.next_idx)
+                    self.save_fitsfile_sub(0, filename, _t, self.ramps, self.groups, self.reads)
+        
+                    measured_durationT = ti.time() - measured_startT
+                    
+                    msg = "%s %.3f %s" % (param[0], measured_durationT, folder_name + "/" + filename)
                     self.publish_to_ics_queue(msg)
+                    
                 else:
-                    msg = CMD_STOPACQUISITION
-                    self.publish_to_ics_queue(msg)
+                    if self.AcquireRamp() == False:
+                        pass
+                    if self.ImageAcquisition():
+                        msg = "%s %.3f %s" % (param[0], self.measured_durationT, self.folder_name)
+                        self.publish_to_ics_queue(msg)
+                    else:
+                        msg = CMD_STOPACQUISITION
+                        self.publish_to_ics_queue(msg)
             
             self.param = ""
             self.acquiring = False
@@ -774,11 +784,13 @@ class DC(threading.Thread):
 
         self.log.send(self._iam, INFO, "Initialize " + RET_OK)
 
-        self.init1 = True
+        if self.handle != 0:
+            self.init1 = True
+            return True
+        else:
+            return False
         
-        return True
-
-
+        
     def Initialize2(self):
         self.init2 = False
 
@@ -881,6 +893,9 @@ class DC(threading.Thread):
 
 
     def load_ASIC(self):
+        if self.handle == 0:
+            return False
+        
         reg = ["6000", "6002", "6004", "602c"]
         _addr = [0 for _ in range(4)]
         _read = [0 for _ in range(4)]
@@ -902,6 +917,8 @@ class DC(threading.Thread):
         self.V_biasgate = hex(int(_read[2]))
         self.V_refmain = hex(int(_read[3]))
         # --------------------------------------------
+        
+        return True
     
 
     def GetAvailableMACIEs(self):
@@ -1262,8 +1279,8 @@ class DC(threading.Thread):
 
             log = "Wait....(%d), stop(%d)" % (i, self.stop)
             self.log.send(self._iam, INFO, log)
-            #ti.sleep(1)
-            ti.sleep(triggerTimeout / 100 / 1000)
+            ti.sleep(1)
+            #ti.sleep(triggerTimeout / 100 / 1000)
 
         if self.stop:
             self.log.send(self._iam, INFO, "Stop: Image Acquiring")
@@ -1795,7 +1812,7 @@ class DC(threading.Thread):
         return sts
 
 
-    def save_fitsfile_final(self, lastfilename, fullpath, filename, sampling, data):
+    def save_fitsfile_final(self, lastfilename, fullpath, filename, sampling, data, simul = False):
 
         self.createFolder(fullpath)
 
@@ -1811,6 +1828,9 @@ class DC(threading.Thread):
         hdulist = fits.open(lastfilename)   #read last fits file for getting header
 
         new_header = hdulist[0].header[:-5]
+        
+        if simul:
+            new_header["SIMUL"] = "Simulation mode"
         
         new_header["NSAMP"] = (sampling, "Number of Fowler Sampling")
         

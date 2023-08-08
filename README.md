@@ -13,20 +13,8 @@
 	```
 	HOME=your home directory
 	```
-4. Check ethernet port in your system
-	
-	`# firewall-cmd --get-active-zones`
-	```
-	public
-	  interfaces: eno1
-	```
-	- After confirming your ethernet port name, 
-	
-		write the name in "dcs_setup.sh" and "run_dc_core.sh".
-	```
-	# firewall-cmd --zone=trusted --change-interface=eno1
-	```
-5. Setup the macie library and python library
+
+4. Setup the macie library and python library
 	```
 	$ cd $HOME/dcs_pack/installation	
 	$ sh dcs_setup.sh
@@ -48,7 +36,7 @@
 	(if read-only error :wq -> :w!)
 	
 	After setup finished, exit the current terminal, **open new terminal**!!!
-6. Set nfs mount
+5. Set nfs mount
 	
 	- dcs: server / ics, TelOps: client
 	```
@@ -78,7 +66,7 @@
 	# firewall-cmd --permanent --add-service=mountd
 	# firewall-cmd --reload
 	```
-7. Install rabbitmq server for local (between DC gui and DC core)
+6. Install rabbitmq server for local (between DC gui and DC core)
 	```
 	$ yum install -y epel-release
 	$ yum install -y erlang
@@ -125,7 +113,7 @@
 	# firewall-cmd --permanent --zone=public --add-port=5672/tcp
 	# firewall-cmd --reload
 	```
-8. Start software
+7. Start software
 	```
 	$ sudo systemctl daemon-reload
 	$ sudo systemctl enable dc-core.service
@@ -155,7 +143,7 @@
 	```
 	$ sh $HOME/dcs_pack/run_dcs.sh gui
 	```
-9. For starting "dc-core.service" without error automatically when system is rebooting,
+8. For starting "dc-core.service" without error automatically when system is rebooting,
 	
 	`# vi /etc/selinux/config`
 	```
