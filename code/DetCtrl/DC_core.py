@@ -3,7 +3,7 @@
 """
 Created on Mar 4, 2022
 
-Modified on Aug 8, 2023
+Modified on Aug 9, 2023
 
 @author: hilee
 """
@@ -451,7 +451,7 @@ class DC(threading.Thread):
 
     def control_MACIE(self):
         
-        self.Initialize(int(self.gige_timeout))
+        self.init_publish(int(self.gige_timeout))
 
         while True:
             if self.param == "":
@@ -462,12 +462,8 @@ class DC(threading.Thread):
             param = self.param.split()
             
             if param[0] == CMD_INITIALIZE1:  
-                if self.Initialize(int(param[1])):
-                    msg = "%s %s %d" % (CMD_INITIALIZE1, self.LibVersion(), self.macieSN)
-                else:
-                    msg = "%s %s 0" % (CMD_INITIALIZE1, self.LibVersion())
-                    self.publish_to_local_queue(msg)
-
+                self.init_publish(int(param[1]))
+                
             elif param[0] == CMD_INITIALIZE2:
                 self.output = int(param[1])
                 self.macie_file = param[2]
@@ -581,7 +577,7 @@ class DC(threading.Thread):
             elif param[0] == CMD_INIT2_DONE or param[0] == CMD_INITIALIZE2_ICS:
                 if bool(int(param[2])):
                     #for simulation
-                    ti.sleep(3)
+                    #ti.sleep(3)
                     self.publish_to_ics_queue(param[0])
                 else:
                     if self.init2:
@@ -606,18 +602,24 @@ class DC(threading.Thread):
                 
                 self.publish_to_ics_queue(param[0])
 
+                #print(self.expTime, self.reads)
+
             elif param[0] == CMD_ACQUIRERAMP_ICS:
                 self.next_idx = int(param[3])
                 
                 if bool(int(param[2])):
                     #for simulation
                     measured_startT = ti.time()    
-                    ti.sleep(self.reads * self.ramps * 2)
+
+                    _time_measure = self.reads*2 + self.expTime
+                    ti.sleep(_time_measure)
+                    #print(_time_measure)
 
                     #copy from demo image
-                    self.fitsfullpath = "SDC%s_demo.fits" % IAM[-1]
+                    self.fitsfullpath = "%s/dcs_pack/code/DetCtrl/SDC%s_demo.fits" % (WORKING_DIR, IAM[-1])
                     frm = fits.open(self.fitsfullpath)[0].data
-                    self.loadimg.append(frm)
+                    self.loadimg = []
+                    self.loadimg.append(frm[0:FRAME_X*FRAME_Y])
 
                     path = "%s/Data/Fowler/" % self.exe_path
                     self.createFolder(path)
@@ -628,8 +630,25 @@ class DC(threading.Thread):
                     path += folder_name + "/"
                     self.createFolder(path)
 
+                    # find last number
+                    dir_names = []
+                    for names in os.listdir(path):
+                        if names.find(".fits") < 0:
+                            dir_names.append(names)
+                    numbers = list(map(int, dir_names))
+                    if len(numbers) > 0:
+                        next_idx = max(numbers) + 1
+                    else:
+                        next_idx = 1
+                    
+                    if self.next_idx == 0:
+                        self.next_idx = next_idx
+                    path2 = path + str(self.next_idx) + "/"
+                    self.createFolder(path2)
+
                     filename = "SDC%s_%s_%04d.fits" % (IAM[-1], folder_name, self.next_idx)
-                    self.save_fitsfile_sub(0, filename, _t, self.ramps, self.groups, self.reads)
+                    full_path = path + filename
+                    self.save_fitsfile_sub(0, full_path, cur_datetime, self.ramps, self.groups, self.reads)
         
                     measured_durationT = ti.time() - measured_startT
                     
@@ -789,8 +808,18 @@ class DC(threading.Thread):
             return True
         else:
             return False
+
+    
+    def init_publish(self, timeout):
+        if self.Initialize(timeout):
+            msg = "%s %s %d" % (CMD_INITIALIZE1, self.LibVersion(), self.macieSN)
+        else:
+            msg = "%s %s 0" % (CMD_INITIALIZE1, self.LibVersion())
         
-        
+        self.publish_to_ics_queue(msg)
+        self.publish_to_local_queue(msg)
+                
+
     def Initialize2(self):
         self.init2 = False
 
@@ -1489,51 +1518,6 @@ class DC(threading.Thread):
 
         return folder_name + "/" + filename, path + "/" + filename
 
-    
-    def WriteFitsFile_window(self):
-        self.log.send(self._iam, INFO, "Write Fits file now (ROI)....")
-    
-        _t = datetime.datetime.utcnow()
-
-        cur_datetime = [_t.year, _t.month, _t.day, _t.hour, _t.minute, _t.second, _t.microsecond]
-
-        path = "%s/Data/" % self.exe_path
-        self.createFolder(path)
-
-        path += "ROI/"
-        self.createFolder(path)
-
-        #str = time.strftime("%Y%m%d_%H%M%S", time.localtime(time.time()))
-        #folder_name = "%04d%02d%02d_%02d%02d%02d" % (cur_datetime[0], cur_datetime[1], cur_datetime[2], cur_datetime[3], cur_datetime[4], cur_datetime[5])
-        folder_name = "%04d%02d%02d" % (cur_datetime[0], cur_datetime[1], cur_datetime[2])
-        path += folder_name + "/"
-        self.createFolder(path)
-
-        dir_names = []
-        for names in os.listdir(path):
-            if names.find(".fits") < 0:
-                dir_names.append(names)
-        numbers = list(map(int, dir_names))
-        if len(numbers) > 0:
-            next_idx = max(numbers) + 1
-        else:
-            next_idx = 1
-
-        self.next_idx = next_idx
-        path2 = path + str(self.next_idx) + "/"
-        self.createFolder(path2)
-
-        filename = "%sH2RG_R01_M01_N01.fits" % path2
-        sts = self.save_fitsfile_sub(0, filename, cur_datetime, 1, 1, 1)
-
-        if sts != MACIE_OK:
-            self.log.send(self._iam, ERROR, self.GetErrMsg())
-            return -1
-        else:
-            self.log.send(self._iam, INFO, filename)
-
-        return folder_name
-            
 
 
     def save_fitsfile_sub(self, idx, filename, cur_datetime, ramp, group, read):

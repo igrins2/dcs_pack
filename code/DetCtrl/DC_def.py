@@ -3,7 +3,7 @@
 """
 Created on Mar 4, 2022
 
-Modified on May 8, 2023
+Modified on Aug 9, 2023
 
 @author: hilee
 """
@@ -141,7 +141,7 @@ CMD_WRITEASICREG = "writeASICreg"
 CMD_READASICREG = "readASICreg"
 CMD_GETTELEMETRY = "GetTelemetry"
 
-ALIVE = "Alive"
+#ALIVE = "Alive"
 
 CMD_INIT2_DONE = "Initialize2_Done"
 CMD_INITIALIZE2_ICS = "Initialize2_ics"
