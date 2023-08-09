@@ -9,6 +9,7 @@ Modified on Aug 9, 2023
 """
 
 #import subprocess
+from random import triangular
 import numpy as np
 import astropy.io.fits as fits
 from astropy.time import Time
