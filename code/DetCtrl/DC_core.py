@@ -627,11 +627,17 @@ class DC(threading.Thread):
                     self.createFolder(path)
                     
                     _t = datetime.datetime.utcnow()
+                    # for recognization in NFS
+                    _t_nextday = _t + datetime.timedelta(days=1)
+                    folder_name_nextday = "%04d%02d%02d" % (_t_nextday.year, _t_nextday.month, _t_nextday.day)
+                    path_nextday = path + folder_name_nextday + "/"
+                    self.createFolder(path_nextday)
+
                     cur_datetime = [_t.year, _t.month, _t.day, _t.hour, _t.minute, _t.second, _t.microsecond]
                     folder_name = "%04d%02d%02d" % (_t.year, _t.month, _t.day)
                     path += folder_name + "/"
                     self.createFolder(path)
-
+                    
                     # find last number
                     dir_names = []
                     for names in os.listdir(path):
@@ -1359,7 +1365,6 @@ class DC(threading.Thread):
             self.log.send(self._iam, INFO, "Write Fits file now....")
 
         _t = datetime.datetime.utcnow()
-        _t_nextday = _t + datetime.timedelta(days=1)
 
         cur_datetime = [_t.year, _t.month, _t.day, _t.hour, _t.minute, _t.second, _t.microsecond]
 
@@ -1376,15 +1381,16 @@ class DC(threading.Thread):
             path += "Fowler/"
         self.createFolder(path)
 
+        # for recognization in NFS
+        _t_nextday = _t + datetime.timedelta(days=1)
+        folder_name_nextday = "%04d%02d%02d" % (_t_nextday.year, _t_nextday.month, _t_nextday.day)
+        path_nextday = path + folder_name_nextday + "/"
+        self.createFolder(path_nextday)
+
         #folder_name = "%04d%02d%02d_%02d%02d%02d" % (cur_datetime[0], cur_datetime[1], cur_datetime[2], cur_datetime[3], cur_datetime[4], cur_datetime[5])
         folder_name = "%04d%02d%02d" % (cur_datetime[0], cur_datetime[1], cur_datetime[2])
         path += folder_name + "/"
-        self.createFolder(path)
-
-        # for recognization in NFS
-        folder_name_nextday = "%04d%02d%02d" % (_t_nextday.year, _t_nextday.month, _t_nextday.day)
-        path_nextday += folder_name_nextday + "/"
-        self.createFolder(path_nextday)
+        self.createFolder(path)       
 
         dir_names = []
         for names in os.listdir(path):
