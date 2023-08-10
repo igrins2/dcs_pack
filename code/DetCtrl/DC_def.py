@@ -23,7 +23,7 @@ except:
     IAM = user.upper()
 
 #FUN_OK = 1
-IAM = "DCSS"
+#IAM = "DCSS"
 FITS_HDR_CNT = 100
 
 FieldNames = [('date', str), ('time', str),
@@ -121,7 +121,7 @@ OBSAPP_BUSY = "ObsAppBusy"
 
 CMD_SIMULATION = "Simulation"
 CMD_VERSION = "LibVersion"
-#CMD_EXIT = "Exit"
+CMD_EXIT = "Exit"
 
 CMD_INITIALIZE1 = "Initialize1"
 CMD_INITIALIZE2 = "Initialize2"

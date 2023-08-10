@@ -444,6 +444,9 @@ class DC(threading.Thread):
                 self.stop = True
                 #self.publish_to_local_queue(CMD_STOPACQUISITION)
             
+            elif param[0] == CMD_EXIT:
+                self.SetDetector(MUX_TYPE, 32)
+            
         except:
             self.log.send(self._iam, WARNING, "parsing error")
 
@@ -647,7 +650,7 @@ class DC(threading.Thread):
 
                     filename = "SDC%s_%s_%04d.fits" % (IAM[-1], folder_name, self.next_idx)
                     full_path = path + filename
-                    self.save_fitsfile_sub(0, full_path, cur_datetime, self.ramps, self.groups, self.reads)
+                    self.save_fitsfile_sub(0, full_path, cur_datetime, self.ramps, self.groups, self.reads, True)
         
                     measured_durationT = ti.time() - measured_startT
                     
@@ -1356,6 +1359,7 @@ class DC(threading.Thread):
             self.log.send(self._iam, INFO, "Write Fits file now....")
 
         _t = datetime.datetime.utcnow()
+        _t_nextday = _t + datetime.timedelta(days=1)
 
         cur_datetime = [_t.year, _t.month, _t.day, _t.hour, _t.minute, _t.second, _t.microsecond]
 
@@ -1376,6 +1380,11 @@ class DC(threading.Thread):
         folder_name = "%04d%02d%02d" % (cur_datetime[0], cur_datetime[1], cur_datetime[2])
         path += folder_name + "/"
         self.createFolder(path)
+
+        # for recognization in NFS
+        folder_name_nextday = "%04d%02d%02d" % (_t_nextday.year, _t_nextday.month, _t_nextday.day)
+        path_nextday += folder_name_nextday + "/"
+        self.createFolder(path_nextday)
 
         dir_names = []
         for names in os.listdir(path):
@@ -1519,7 +1528,7 @@ class DC(threading.Thread):
 
 
 
-    def save_fitsfile_sub(self, idx, filename, cur_datetime, ramp, group, read):
+    def save_fitsfile_sub(self, idx, filename, cur_datetime, ramp, group, read, simul = False):
         try:
 
             header_array = MACIE_FitsHdr * FITS_HDR_CNT
@@ -1766,6 +1775,10 @@ class DC(threading.Thread):
             pHeaders[header_cnt] = MACIE_FitsHdr(key="SEQNNAME".encode(), valType=HDR_STR, sVal=str.encode(), comment="Ramp and Group String".encode())
             header_cnt += 1
 
+            if simul:
+                pHeaders[header_cnt] = MACIE_FitsHdr(key="SIMUL".encode(), valType=HDR_STR, sVal="Simulation mode".encode(), comment="")
+                header_cnt += 1
+
             if self.ROIMode:
                 pHeaders[header_cnt] = MACIE_FitsHdr(key="X_START".encode(), valType=HDR_INT, iVal=self.x_start, comment="X start (ROI)".encode())
                 header_cnt += 1
@@ -1795,7 +1808,7 @@ class DC(threading.Thread):
         return sts
 
 
-    def save_fitsfile_final(self, lastfilename, fullpath, filename, sampling, data, simul = False):
+    def save_fitsfile_final(self, lastfilename, fullpath, filename, sampling, data):
 
         self.createFolder(fullpath)
 
@@ -1811,9 +1824,6 @@ class DC(threading.Thread):
         hdulist = fits.open(lastfilename)   #read last fits file for getting header
 
         new_header = hdulist[0].header[:-5]
-        
-        if simul:
-            new_header["SIMUL"] = "Simulation mode"
         
         new_header["NSAMP"] = (sampling, "Number of Fowler Sampling")
         

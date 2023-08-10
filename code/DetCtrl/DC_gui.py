@@ -149,7 +149,7 @@ class MainWindow(Ui_Dialog, QMainWindow):
 
         self.log.send(self._iam, INFO, "DCS gui closing...")
 
-        #self.publish_to_queue(CMD_EXIT)
+        self.publish_to_queue(CMD_EXIT)
 
         for th in threading.enumerate():
             self.log.send(self._iam, INFO, th.name + " exit.")
