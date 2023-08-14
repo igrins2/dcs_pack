@@ -1782,7 +1782,7 @@ class DC(threading.Thread):
             header_cnt += 1
 
             if simul:
-                pHeaders[header_cnt] = MACIE_FitsHdr(key="SIMUL".encode(), valType=HDR_STR, sVal="Simulation mode".encode(), comment="")
+                pHeaders[header_cnt] = MACIE_FitsHdr(key="SIMUL".encode(), valType=HDR_STR, sVal="Simulation mode".encode(), comment="".encode())
                 header_cnt += 1
 
             if self.ROIMode:
