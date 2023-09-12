@@ -26,6 +26,11 @@ except:
 IAM = "DCSS"
 FITS_HDR_CNT = 100
 
+#for simul
+SVC = 0
+H = 1
+K = 2
+
 FieldNames = [('date', str), ('time', str),
               ('pressure', float),
               ('bench', float), ('bench_tc', float),
@@ -117,7 +122,7 @@ ASICAddr_State = 0x6900
 
 UPLOAD_Q = "UploadDBQ"    #uploader
 
-OBSAPP_BUSY = "ObsAppBusy"
+#OBSAPP_BUSY = "ObsAppBusy"
 
 CMD_SIMULATION = "Simulation"
 CMD_VERSION = "LibVersion"
@@ -141,9 +146,12 @@ CMD_WRITEASICREG = "writeASICreg"
 CMD_READASICREG = "readASICreg"
 CMD_GETTELEMETRY = "GetTelemetry"
 
+CMD_BUSY = "Busy"
+
 #ALIVE = "Alive"
 
 CMD_INIT2_DONE = "Initialize2_Done"
 CMD_INITIALIZE2_ICS = "Initialize2_ics"
 CMD_SETFSPARAM_ICS = "SetFSParam_ics"
 CMD_ACQUIRERAMP_ICS = "ACQUIRERAMP_ics"
+CMD_RESTART = "Restart"

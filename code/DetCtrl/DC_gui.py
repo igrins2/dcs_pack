@@ -130,12 +130,13 @@ class MainWindow(Ui_Dialog, QMainWindow):
 
         self.prog_sts.setValue(0)
 
-        self.param = ""
+        self.param = None
 
         self.connect_to_server_ex()
         self.connect_to_server_q()
 
         self.busy = False
+        self.acquiring = False
 
         self.core_timer = QTimer(self)
         self.core_timer.setInterval(100)
@@ -207,18 +208,21 @@ class MainWindow(Ui_Dialog, QMainWindow):
 
 
     def core_process(self):
-        if self.param == "":
+        if self.param == None:
             return
 
-        param = self.param.split()
-
-        self.busy = False        
+        param = self.param.split()    
     
         try: 
             #if param[0] == CMD_EXIT:
             #    self.initialized(False)
+            if param[0] == CMD_BUSY:
+                if not self.acquiring:
+                    self.btn_acquireramp.setEnabled(False)
+                    self.btn_stop.setEnabled(False)
+                    self.QWidgetBtnColor(self.btn_acquireramp, "silver")
 
-            if param[0] == CMD_VERSION:
+            elif param[0] == CMD_VERSION:
                 if bool(int(param[3])):
                     info = "%s (%s)" % (param[1], param[2])
                     self.label_ver.setText(info)
@@ -237,12 +241,15 @@ class MainWindow(Ui_Dialog, QMainWindow):
                     info = "%s (%s)" % (param[1], param[2])
                     
                 self.label_ver.setText(info)
+                self.busy = False
             
             elif param[0] == CMD_INITIALIZE2:
                 self.QWidgetBtnColor(self.btn_initialize2, "black")
+                self.busy = False
 
             elif param[0] == CMD_RESET:
                 self.QWidgetBtnColor(self.btn_reset, "black")
+                self.busy = False
 
             #elif param[0] == CMD_DOWNLOAD:
             #    pass
@@ -261,6 +268,13 @@ class MainWindow(Ui_Dialog, QMainWindow):
             #    self.acquireramp()         
 
             elif param[0] == CMD_ACQUIRERAMP:
+                if not self.acquiring:
+                    self.btn_acquireramp.setEnabled(True)
+                    self.btn_stop.setEnabled(True)
+                    self.QWidgetBtnColor(self.btn_acquireramp, "black")
+                    
+                    self.param = None
+                    return
 
                 self.QWidgetBtnColor(self.btn_acquireramp, "black")
 
@@ -275,19 +289,7 @@ class MainWindow(Ui_Dialog, QMainWindow):
                 show_cur_cnt = "%d / %s" % (self.cur_cnt, self.e_repeat.text())
                 self.label_cur_num.setText(show_cur_cnt)
 
-                if self.cur_cnt < int(self.e_repeat.text()):
-                    #self.acquireramp()
-                    #ti.sleep(0.5)
-                    self.btn_acquireramp.click()
-                else:
-                    self.cur_cnt = 0
-
                 self.label_measured_time.setText(param[1])
-
-                if self.chk_show_fits.isChecked():
-                    ds9 = WORKING_DIR + 'DCS/ds9'
-                    subprocess.Popen([ds9, self.fitsfullpath])
-
                 if self.chk_autosave.isChecked():
                     file = param[2].split("/")
                     #path = ""
@@ -296,10 +298,30 @@ class MainWindow(Ui_Dialog, QMainWindow):
                     #    path += i
                     #self.e_user_dir.setText(path)
                     self.e_user_file.setText(file[-1][:-5] + "_")
-                        
+
+                if self.cur_cnt < int(self.e_repeat.text()):
+                    #self.acquireramp()
+                    #ti.sleep(0.5)
+                    self.btn_acquireramp.click()
+
+                    self.param = None
+                    return
+                else:
+                    self.cur_cnt = 0
+
+                if self.chk_show_fits.isChecked():
+                    ds9 = WORKING_DIR + 'DCS/ds9'
+                    subprocess.Popen([ds9, self.fitsfullpath])
+
+                self.acquiring = False                        
 
             elif param[0] == CMD_STOPACQUISITION:
-                pass
+                self.btn_acquireramp.setEnabled(True)
+                self.btn_stop.setEnabled(True)
+
+                self.QWidgetBtnColor(self.btn_acquireramp, "black")
+
+                self.acquiring = False 
 
             elif param[0] == CMD_ASICLOAD:
                 self.e_read_Vreset.setText(str(hex(int(param[1])))[2:6])
@@ -337,11 +359,12 @@ class MainWindow(Ui_Dialog, QMainWindow):
                     self.e_read_input.setText(_text)
 
             elif param[0] == CMD_GETTELEMETRY:
-                pass
+                self.busy = False
+
             else:
                 pass
 
-            self.param = ""
+            self.param = None
             
         except:
             self.log.send(self._iam, WARNING, "parsing error")
@@ -680,9 +703,7 @@ class MainWindow(Ui_Dialog, QMainWindow):
                 return
             ti.sleep(0.5)
 
-        if self.busy:
-            return
-        self.busy = True
+        self.acquiring = True
 
         show_cur_cnt = "%d / %s" % (self.cur_cnt, self.e_repeat.text())
         self.label_cur_num.setText(show_cur_cnt)
@@ -745,7 +766,7 @@ class MainWindow(Ui_Dialog, QMainWindow):
 
     def stop_acquistion(self):
         
-        self.busy = False
+        self.acquiring = False
         
         if self.cur_prog_step == 0:
             return

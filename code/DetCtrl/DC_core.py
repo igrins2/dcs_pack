@@ -3,7 +3,7 @@
 """
 Created on Mar 4, 2022
 
-Modified on Aug 9, 2023
+Modified on Aug 25, 2023 
 
 @author: hilee
 """
@@ -180,6 +180,7 @@ class DC(threading.Thread):
         self.resets, self.reads, self.ramps, self.groups, self.drops = 1, 1, 1, 1, 1
         
         self.loadimg = []
+        self.loadimg_test = [[] for _ in range(3)] #for simul
 
         self.measured_startT = 0
         self.measured_durationT = 0
@@ -201,10 +202,10 @@ class DC(threading.Thread):
         self.stop = False
         self.dewar_info = False
 
-        self.param = ""
+        self.param = None
         #self.where = ""
 
-        #ti.sleep(2)
+        ti.sleep(5)
 
         self.connect_to_server_dcs_ex() # InstSeq, DTP, ObsApp
         
@@ -224,9 +225,8 @@ class DC(threading.Thread):
         threading.Thread(target=self.control_MACIE).start()
         #self.control_MACIE()
 
-
     def __del__(self):
-
+        
         self.MemoryFree()
 
         self.log.send(self._iam, INFO, "DCS core closing...")
@@ -242,6 +242,7 @@ class DC(threading.Thread):
             self.consumer[i].channel.close()
 
         self.log.send(self._iam, INFO, "DCS core closed!")
+
              
        
     #---------------------------------------------------------------------------------------------
@@ -276,6 +277,15 @@ class DC(threading.Thread):
 
     def callback_InstSeq(self, ch, method, properties, body):
         cmd = body.decode()        
+
+        if cmd == CMD_RESTART:
+            msg = "<- [%s] %s" % (cmd, "InstSeq")
+            self.log.send(IAM, INFO, msg)
+
+            os.system("shutdown -r -f")
+            self.__del__()
+            #return
+
         self.process_from_ICS(cmd, "InstSeq")
         
         
@@ -321,21 +331,85 @@ class DC(threading.Thread):
             return
 
         try:
-            if param[0] == CMD_STOPACQUISITION:
-                self.stop = True
-                #print("received 'stop'!!!!!!")
+            if IAM == "DCSS" and param[1] == "H_K":
+                # for simulation
                 if bool(int(param[2])):
-                    self.publish_to_ics_queue(param[0])
-                    
-            elif param[0] == OBSAPP_BUSY:
-                self.stop = True
+                    if param[0] == CMD_SETFSPARAM_ICS:
+                        self.expTime_hk = float(param[3])
+                        self.read_hk = int(param[5])
+                                        
+                        self.publish_to_ics_queue(param[0])
 
-            if self.acquiring:
+                    elif param[0] == CMD_ACQUIRERAMP_ICS:
+                        self.publish_to_local_queue(CMD_BUSY)
+                        self.publish_to_ics_queue(CMD_BUSY)
+
+                        next_idx = int(param[3])
+                        measured_startT = ti.time()    
+
+                        _time_measure = self.read_hk*2 + self.expTime_hk
+                        ti.sleep(_time_measure)
+                        
+                        #copy from demo image
+                        
+                        # for H
+                        fitsfullpath_h = "%s/dcs_pack/code/DetCtrl/SDCH_demo.fits" % WORKING_DIR
+                        frm = fits.open(fitsfullpath_h)[0].data
+                        self.loadimg_test[H] = frm[0:FRAME_X*FRAME_Y]
+
+                        # for K
+                        fitsfullpath_k = "%s/dcs_pack/code/DetCtrl/SDCK_demo.fits" % WORKING_DIR
+                        frm = fits.open(fitsfullpath_k)[0].data
+                        self.loadimg_test[K] = frm[0:FRAME_X*FRAME_Y]
+
+                        path = "%s/Data/Fowler/" % self.exe_path
+                        self.createFolder(path)
+                        
+                        _t = datetime.datetime.utcnow()
+                        # for recognization in NFS
+                        _t_nextday = _t + datetime.timedelta(days=1)
+                        folder_name_nextday = "%04d%02d%02d" % (_t_nextday.year, _t_nextday.month, _t_nextday.day)
+                        path_nextday = path + folder_name_nextday + "/"
+                        self.createFolder(path_nextday)
+
+                        cur_datetime = [_t.year, _t.month, _t.day, _t.hour, _t.minute, _t.second, _t.microsecond]
+                        folder_name = "%04d%02d%02d" % (_t.year, _t.month, _t.day)
+                        path += folder_name + "/"
+                        self.createFolder(path)
+                        
+                        path2 = path + str(next_idx) + "/"
+                        self.createFolder(path2)
+
+                        # for H
+                        filename = "SDCH_%s_%04d.fits" % (folder_name, next_idx)
+                        full_path = path + filename
+                        self.save_fitsfile_sub(H, full_path, cur_datetime, 1, 1, self.read_hk, True)
+
+                        # for K
+                        filename = "SDCK_%s_%04d.fits" % (folder_name, next_idx)
+                        full_path = path + filename
+                        self.save_fitsfile_sub(K, full_path, cur_datetime, 1, 1, self.read_hk, True)
+            
+                        measured_durationT = ti.time() - measured_startT
+                        
+                        msg = "%s %.3f %s" % (param[0], measured_durationT, folder_name + "/" + filename)
+                        self.publish_to_ics_queue(msg)
+
+                        self.publish_to_local_queue(CMD_ACQUIRERAMP)
+
+                return    
+
+            if not (param[1] == IAM or param[1] == "all"):
                 return
 
-            if IAM == "DCSS" and param[1] == "H_K":
-                return    
-            if not (param[1] == IAM or param[1] == "all"):
+            if param[0] == CMD_STOPACQUISITION:
+                self.stop = True
+                if bool(int(param[2])):
+                    self.acquiring = False
+                    self.publish_to_local_queue(param[0])
+                    self.publish_to_ics_queue(param[0])
+
+            if self.acquiring:
                 return
 
             msg = "<- [%s] %s" % (cmd, where)
@@ -442,7 +516,7 @@ class DC(threading.Thread):
             
             elif param[0] == CMD_STOPACQUISITION:
                 self.stop = True
-                #self.publish_to_local_queue(CMD_STOPACQUISITION)
+                self.publish_to_ics_queue(param[0])
             
             elif param[0] == CMD_EXIT:
                 self.SetDetector(MUX_TYPE, 32)
@@ -456,7 +530,7 @@ class DC(threading.Thread):
         self.init_publish(int(self.gige_timeout))
 
         while True:
-            if self.param == "":
+            if self.param == None:
                 continue     
             
             self.acquiring = True
@@ -499,6 +573,8 @@ class DC(threading.Thread):
                 self.SetFSParam(int(param[2]), int(param[3]), int(param[4]), float(param[5]), int(param[6]))
 
             elif param[0] == CMD_ACQUIRERAMP:
+                self.publish_to_ics_queue(CMD_BUSY)
+
                 self.next_idx = 0
                 #print("acquire!!!!")
                 if param[1] == "0":
@@ -506,14 +582,16 @@ class DC(threading.Thread):
                     if self.AcquireRamp() == False:
                         pass
                     if self.ImageAcquisition():
-                        msg = "%s %.3f %s" % (CMD_ACQUIRERAMP, self.measured_durationT, self.full_path)
+                        msg = "%s %.3f %s" % (param[0], self.measured_durationT, self.full_path)
                         self.publish_to_local_queue(msg)
                 else:
                     self.ROIMode = True
 
                     if self.AcquireRamp_window():
-                        msg = "%s %.3f %s" % (CMD_ACQUIRERAMP, self.measured_durationT, self.full_path)
+                        msg = "%s %.3f %s" % (param[0], self.measured_durationT, self.full_path)
                         self.publish_to_local_queue(msg)
+
+                self.publish_to_ics_queue(CMD_ACQUIRERAMP_ICS)
 
             elif param[0] == CMD_ASICLOAD:
                 _read = [0 for _ in range(4)]
@@ -607,6 +685,9 @@ class DC(threading.Thread):
                 #print(self.expTime, self.reads)
 
             elif param[0] == CMD_ACQUIRERAMP_ICS:
+                self.publish_to_local_queue(CMD_BUSY)
+                self.publish_to_ics_queue(CMD_BUSY)
+
                 self.next_idx = int(param[3])
                 
                 if bool(int(param[2])):
@@ -615,13 +696,11 @@ class DC(threading.Thread):
 
                     _time_measure = self.reads*2 + self.expTime
                     ti.sleep(_time_measure)
-                    #print(_time_measure)
-
+                    
                     #copy from demo image
                     self.fitsfullpath = "%s/dcs_pack/code/DetCtrl/SDC%s_demo.fits" % (WORKING_DIR, IAM[-1])
                     frm = fits.open(self.fitsfullpath)[0].data
-                    self.loadimg = []
-                    self.loadimg.append(frm[0:FRAME_X*FRAME_Y])
+                    self.loadimg_test[0] = frm[0:FRAME_X*FRAME_Y]
 
                     path = "%s/Data/Fowler/" % self.exe_path
                     self.createFolder(path)
@@ -662,18 +741,24 @@ class DC(threading.Thread):
                     
                     msg = "%s %.3f %s" % (param[0], measured_durationT, folder_name + "/" + filename)
                     self.publish_to_ics_queue(msg)
-                    
+
+                    self.publish_to_local_queue(CMD_ACQUIRERAMP)
+
                 else:
                     if self.AcquireRamp() == False:
                         pass
                     if self.ImageAcquisition():
                         msg = "%s %.3f %s" % (param[0], self.measured_durationT, self.folder_name)
                         self.publish_to_ics_queue(msg)
+
+                        self.publish_to_local_queue(CMD_ACQUIRERAMP)
+
                     else:
                         msg = CMD_STOPACQUISITION
+                        self.publish_to_local_queue(msg)
                         self.publish_to_ics_queue(msg)
             
-            self.param = ""
+            self.param = None
             self.acquiring = False
 
 
@@ -1305,6 +1390,7 @@ class DC(threading.Thread):
         byte = 0
         for i in range(int(triggerTimeout/100 * frame_cnt * 2)):
             if self.stop:
+                self.acquiring = False
                 break
 
             byte = lib.MACIE_AvailableScienceData(self.handle)
@@ -1799,7 +1885,10 @@ class DC(threading.Thread):
                 data = arr.ctypes.data_as(POINTER(c_ushort))
                 sts = lib.MACIE_WriteFitsFile(c_char_p(filename.encode()), self.x_stop - self.x_start + 1, self.y_stop - self.y_start + 1, data, header_cnt, pHeaders)
             else:
-                arr = np.array(self.loadimg[idx], dtype=np.int16)
+                if simul:
+                    arr = np.array(self.loadimg_test[idx], dtype=np.int16)
+                else:        
+                    arr = np.array(self.loadimg[idx], dtype=np.int16)
                 data = arr.ctypes.data_as(POINTER(c_ushort))
                 sts = lib.MACIE_WriteFitsFile(c_char_p(filename.encode()), FRAME_X, FRAME_Y, data, header_cnt, pHeaders)
             
