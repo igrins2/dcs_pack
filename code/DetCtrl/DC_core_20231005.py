@@ -347,6 +347,8 @@ class DC(threading.Thread):
                             ti.sleep(1)
 
                     if param[0] == CMD_SETFSPARAM_ICS:
+                        self.acquiring = True
+
                         self.expTime_hk = float(param[3])
                         self.read_hk = int(param[5])
                                         
@@ -354,8 +356,6 @@ class DC(threading.Thread):
                         self.publish_to_ics_queue(msg)                    
 
                     elif param[0] == CMD_ACQUIRERAMP_ICS:
-                        self.acquiring = True   #20231006
-                        
                         next_idx = int(param[3])
                         measured_startT = ti.time()    
 
@@ -564,6 +564,8 @@ class DC(threading.Thread):
         while True:
             if self.param == None:
                 continue     
+            
+            self.acquiring = True
 
             param = self.param.split()
             
@@ -571,8 +573,6 @@ class DC(threading.Thread):
                 self.init_publish(int(param[1]))
                 
             elif param[0] == CMD_INITIALIZE2:
-                self.acquiring = True   #20231006
-
                 self.output = int(param[1])
                 self.macie_file = param[2]
                 self.asic_file = param[3]
@@ -588,33 +588,23 @@ class DC(threading.Thread):
                     self.publish_to_local_queue(CMD_INITIALIZE2)                
 
             elif param[0] == CMD_SETDETECTOR:
-                self.acquiring = True   #20231006
-
                 self.output = int(param[1])
                 if self.SetDetector(MUX_TYPE, self.output):
                     pass
 
             elif param[0] == CMD_RESET:
-                self.acquiring = True   #20231006
-
                 if self.ResetASIC():
                     self.publish_to_local_queue(CMD_RESET)
 
             elif param[0] == CMD_SETRAMPPARAM:
-                self.acquiring = True   #20231006
-
                 self.expTime = float(param[1])
                 self.SetRampParam(int(param[2]), int(param[3]), int(param[4]), int(param[5]), int(param[6]))
 
             elif param[0] == CMD_SETFSPARAM:
-                self.acquiring = True   #20231006
-
                 self.expTime = float(param[1])
                 self.SetFSParam(int(param[2]), int(param[3]), int(param[4]), float(param[5]), int(param[6]))
 
             elif param[0] == CMD_ACQUIRERAMP:
-                self.acquiring = True   #20231006
-
                 self.next_idx = 0
                 #print("acquire!!!!")
                 if param[1] == "0":
@@ -632,8 +622,6 @@ class DC(threading.Thread):
                         self.publish_to_local_queue(msg)
 
             elif param[0] == CMD_ASICLOAD:
-                self.acquiring = True   #20231006
-
                 _read = [0 for _ in range(4)]
                 idx = 1
                 for i in range(4):
@@ -665,8 +653,6 @@ class DC(threading.Thread):
                 # --------------------------------------------
 
             elif param[0] == CMD_WRITEASICREG:
-                self.acquiring = True   #20231006
-
                 res = self.write_ASIC_reg(int(param[1]), int(param[2]))
                 if res == MACIE_OK:
                     result = RET_OK
@@ -678,8 +664,6 @@ class DC(threading.Thread):
                 self.log.send(self._iam, INFO, msg)
             
             elif param[0] == CMD_READASICREG:
-                self.acquiring = True   #20231006
-
                 val, sts = self.read_ASIC_reg(int(param[1]))
                 if sts == MACIE_OK:
                     result = RET_OK
@@ -694,8 +678,6 @@ class DC(threading.Thread):
                 self.log.send(self._iam, INFO, msg)
 
             elif param[0] == CMD_GETTELEMETRY:
-                self.acquiring = True   #20231006
-
                 self.GetTelemetry()
 
             #--------------------------------------------------------         
@@ -711,8 +693,6 @@ class DC(threading.Thread):
                         msg = "%s %d" % (param[0], True)
                         self.publish_to_ics_queue(msg)
                     else:
-                        self.acquiring = True   #20231006
-
                         res = True
                         if self.Initialize2() == False:
                             res = False
@@ -730,8 +710,6 @@ class DC(threading.Thread):
 
                         
             elif param[0] == CMD_SETFSPARAM_ICS:
-                self.acquiring = True   #20231006
-
                 self.samplingMode = FOWLER_MODE
                 if len(param) > 3:
                     self.expTime = float(param[3])
@@ -800,8 +778,6 @@ class DC(threading.Thread):
                     self.publish_to_ics_queue(msg)
 
                 else:
-                    self.acquiring = True   #20231006
-
                     res = True
                     if self.AcquireRamp() == False:
                         res = False

@@ -47,7 +47,7 @@
 	```
 	`# vi /etc/exports`
 	```
-	$HOME/DCS/Data 192.168.1.10(rw,sync,no_root_squash)
+	$HOME/DCS/Data 192.168.1.203(rw,sync,no_root_squash)
 	$HOME/DCS/Data "ip address of TelOps"(rw,sync,no_root_squash)
 	```
 	`# exportfs -arv`

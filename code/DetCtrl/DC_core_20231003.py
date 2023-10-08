@@ -3,7 +3,7 @@
 """
 Created on Mar 4, 2022
 
-Modified on Oct 4, 2023 
+Modified on Oct 2, 2023 
 
 @author: hilee
 """
@@ -40,7 +40,7 @@ fowler_calculation = lib2.fowler_calculation
 fowler_calculation.argtypes = (c_int, c_int, c_int, POINTER(c_ushort))
 fowler_calculation.restype = POINTER(c_float)
 
-if IAM == DCSS:
+if IAM == "DCSS":
     lib3 = cdll.LoadLibrary(WORKING_DIR + "dcs_pack/code/ROI/libroi_mode.so")
     acquire_win_ramp = lib3.Acquire_SlowWinRamp
     acquire_win_ramp.argtypes = (c_ulong, c_ubyte, c_ubyte, c_uint, c_uint, c_uint, c_uint, c_uint, c_uint, c_uint)
@@ -212,7 +212,7 @@ class DC(threading.Thread):
         
         self.connect_to_server_InstSeq_q() 
         # ObsApp
-        if IAM == DCSS:
+        if IAM == "DCSS":
             self.connect_to_server_ObsApp_q() 
         self.connect_to_server_dt_q()
         
@@ -282,14 +282,14 @@ class DC(threading.Thread):
         if cmd == CMD_RESTART:
             self.stop = True
 
-            msg = "<- [%s] %s" % (cmd, FROM_INSTSEQ)
+            msg = "<- [%s] %s" % (cmd, "InstSeq")
             self.log.send(IAM, INFO, msg)
 
             os.system("shutdown -r -f")
             self.__del__()
             #return
             
-        self.process_from_ICS(cmd, FROM_INSTSEQ)
+        self.process_from_ICS(cmd, "InstSeq")
         
         
     #-------------------------------     
@@ -306,7 +306,7 @@ class DC(threading.Thread):
         
     def callback_ObsApp(self, ch, method, properties, body):
         cmd = body.decode()                
-        self.process_from_ICS(cmd, FROM_OBSAPP)
+        self.process_from_ICS(cmd, "ObsApp")
         
         
     #---------------------------------------------------------------------------------------------
@@ -323,7 +323,7 @@ class DC(threading.Thread):
 
     def callback_dt(self, ch, method, properties, body):
         cmd = body.decode()        
-        self.process_from_ICS(cmd, FROM_DTP)
+        self.process_from_ICS(cmd, "DTP")
     
         
     def process_from_ICS(self, cmd, where):
@@ -334,19 +334,21 @@ class DC(threading.Thread):
             return
 
         try:
-            if IAM == DCSS and param[1] == FROM_HK:
+            if IAM == "DCSS" and param[1] == "H_K":
                 # for simulation
                 if bool(int(param[2])):
 
                     if self.acquiring:
-                        if where == FROM_DTP:
+                        if where == "DTP":
                             self.publish_to_ics_queue(CMD_BUSY)
                             return
-                        elif where == FROM_INSTSEQ or where == FROM_OBSAPP:
+                        elif where == "InstSeq" or where == "ObsApp":
                             self.stop = True
                             ti.sleep(1)
 
                     if param[0] == CMD_SETFSPARAM_ICS:
+                        self.acquiring = True
+
                         self.expTime_hk = float(param[3])
                         self.read_hk = int(param[5])
                                         
@@ -354,8 +356,6 @@ class DC(threading.Thread):
                         self.publish_to_ics_queue(msg)                    
 
                     elif param[0] == CMD_ACQUIRERAMP_ICS:
-                        self.acquiring = True   #20231006
-                        
                         next_idx = int(param[3])
                         measured_startT = ti.time()    
 
@@ -410,20 +410,11 @@ class DC(threading.Thread):
                         self.acquiring = False
 
                 return    
-            
-            #----------------------------------
-            # 20231003
-            if where == FROM_DTP and not (param[1] == IAM or param[1] == FROM_ALL):
+
+            if (IAM == "DCSH" or IAM == "DCSK") and param[1] != "H_K":
                 return
-            elif where == FROM_INSTSEQ:
-                if (IAM == "DCSH" or IAM == "DCSK") and not (param[1] == IAM or param[1] == FROM_HK or param[1] == FROM_ALL):
-                    return
-                elif IAM == DCSS and not (param[1] == IAM or param[1] == FROM_ALL):
-                    return
-            elif where == FROM_OBSAPP:
-                if IAM == DCSS and param[1] != IAM:
-                    return
-            #----------------------------------
+            if not (param[1] == IAM or param[1] == "all") and param[1] != "H_K":
+                return      
 
             if param[0] == CMD_STOPACQUISITION:
                 if bool(int(param[2])): #for simulation
@@ -436,10 +427,10 @@ class DC(threading.Thread):
             self.log.send(IAM, INFO, msg)
 
             if self.acquiring:
-                if where == FROM_DTP:
+                if where == "DTP":
                     self.publish_to_ics_queue(CMD_BUSY)
                     return
-                elif where == FROM_INSTSEQ or where == FROM_OBSAPP:
+                elif where == "InstSeq" or where == "ObsApp":
                     self.stop = True
                     ti.sleep(1)
 
@@ -564,6 +555,8 @@ class DC(threading.Thread):
         while True:
             if self.param == None:
                 continue     
+            
+            self.acquiring = True
 
             param = self.param.split()
             
@@ -571,8 +564,6 @@ class DC(threading.Thread):
                 self.init_publish(int(param[1]))
                 
             elif param[0] == CMD_INITIALIZE2:
-                self.acquiring = True   #20231006
-
                 self.output = int(param[1])
                 self.macie_file = param[2]
                 self.asic_file = param[3]
@@ -588,33 +579,23 @@ class DC(threading.Thread):
                     self.publish_to_local_queue(CMD_INITIALIZE2)                
 
             elif param[0] == CMD_SETDETECTOR:
-                self.acquiring = True   #20231006
-
                 self.output = int(param[1])
                 if self.SetDetector(MUX_TYPE, self.output):
                     pass
 
             elif param[0] == CMD_RESET:
-                self.acquiring = True   #20231006
-
                 if self.ResetASIC():
                     self.publish_to_local_queue(CMD_RESET)
 
             elif param[0] == CMD_SETRAMPPARAM:
-                self.acquiring = True   #20231006
-
                 self.expTime = float(param[1])
                 self.SetRampParam(int(param[2]), int(param[3]), int(param[4]), int(param[5]), int(param[6]))
 
             elif param[0] == CMD_SETFSPARAM:
-                self.acquiring = True   #20231006
-
                 self.expTime = float(param[1])
                 self.SetFSParam(int(param[2]), int(param[3]), int(param[4]), float(param[5]), int(param[6]))
 
             elif param[0] == CMD_ACQUIRERAMP:
-                self.acquiring = True   #20231006
-
                 self.next_idx = 0
                 #print("acquire!!!!")
                 if param[1] == "0":
@@ -632,8 +613,6 @@ class DC(threading.Thread):
                         self.publish_to_local_queue(msg)
 
             elif param[0] == CMD_ASICLOAD:
-                self.acquiring = True   #20231006
-
                 _read = [0 for _ in range(4)]
                 idx = 1
                 for i in range(4):
@@ -665,8 +644,6 @@ class DC(threading.Thread):
                 # --------------------------------------------
 
             elif param[0] == CMD_WRITEASICREG:
-                self.acquiring = True   #20231006
-
                 res = self.write_ASIC_reg(int(param[1]), int(param[2]))
                 if res == MACIE_OK:
                     result = RET_OK
@@ -678,8 +655,6 @@ class DC(threading.Thread):
                 self.log.send(self._iam, INFO, msg)
             
             elif param[0] == CMD_READASICREG:
-                self.acquiring = True   #20231006
-
                 val, sts = self.read_ASIC_reg(int(param[1]))
                 if sts == MACIE_OK:
                     result = RET_OK
@@ -694,8 +669,6 @@ class DC(threading.Thread):
                 self.log.send(self._iam, INFO, msg)
 
             elif param[0] == CMD_GETTELEMETRY:
-                self.acquiring = True   #20231006
-
                 self.GetTelemetry()
 
             #--------------------------------------------------------         
@@ -711,8 +684,6 @@ class DC(threading.Thread):
                         msg = "%s %d" % (param[0], True)
                         self.publish_to_ics_queue(msg)
                     else:
-                        self.acquiring = True   #20231006
-
                         res = True
                         if self.Initialize2() == False:
                             res = False
@@ -730,8 +701,6 @@ class DC(threading.Thread):
 
                         
             elif param[0] == CMD_SETFSPARAM_ICS:
-                self.acquiring = True   #20231006
-
                 self.samplingMode = FOWLER_MODE
                 if len(param) > 3:
                     self.expTime = float(param[3])
@@ -800,8 +769,6 @@ class DC(threading.Thread):
                     self.publish_to_ics_queue(msg)
 
                 else:
-                    self.acquiring = True   #20231006
-
                     res = True
                     if self.AcquireRamp() == False:
                         res = False
@@ -1723,7 +1690,7 @@ class DC(threading.Thread):
             pHeaders[header_cnt] = MACIE_FitsHdr(key="FRMTIME".encode(), valType=HDR_FLOAT, fVal=T_frame, comment="Frame time".encode())        
             header_cnt += 1
 
-            pHeaders[header_cnt] = MACIE_FitsHdr(key="EXPTIME".encode(), valType=HDR_FLOAT, fVal=self.expTime, comment="sec, Exposure Time".encode())
+            pHeaders[header_cnt] = MACIE_FitsHdr(key="EXPTIMET".encode(), valType=HDR_FLOAT, fVal=self.expTime, comment="sec, Exposure Time".encode())
             header_cnt += 1
             
             pHeaders[header_cnt] = MACIE_FitsHdr(key="FOWLTIME".encode(), valType=HDR_FLOAT, fVal=self.fowlerTime, comment="sec, Fowler Time".encode())

@@ -3,7 +3,7 @@
 """
 Created on Aug 4, 2022
 
-Modified on Sep 30, 2023
+Modified on Aug 4, 2023
 
 @author: hilee
 """
@@ -217,9 +217,10 @@ class MainWindow(Ui_Dialog, QMainWindow):
             #if param[0] == CMD_EXIT:
             #    self.initialized(False)
             if param[0] == CMD_BUSY:
-                self.acquiring = False
-                msg = "Detector is busy! Please wait a few second!"
-                QMessageBox.warning(self, WARNING, msg)
+                if not self.acquiring:
+                    self.btn_acquireramp.setEnabled(False)
+                    self.btn_stop.setEnabled(False)
+                    self.QWidgetBtnColor(self.btn_acquireramp, "silver")
 
             elif param[0] == CMD_VERSION:
                 if bool(int(param[3])):
@@ -267,6 +268,14 @@ class MainWindow(Ui_Dialog, QMainWindow):
             #    self.acquireramp()         
 
             elif param[0] == CMD_ACQUIRERAMP:
+                if not self.acquiring:
+                    self.btn_acquireramp.setEnabled(True)
+                    self.btn_stop.setEnabled(True)
+                    self.QWidgetBtnColor(self.btn_acquireramp, "black")
+                    
+                    self.param = None
+                    return
+
                 self.QWidgetBtnColor(self.btn_acquireramp, "black")
 
                 self.prog_timer.stop()

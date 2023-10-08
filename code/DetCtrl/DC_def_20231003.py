@@ -3,7 +3,7 @@
 """
 Created on Mar 4, 2022
 
-Modified on Oct 4, 2023
+Modified on Aug 9, 2023
 
 @author: hilee
 """
@@ -23,21 +23,13 @@ except:
     IAM = user.upper()
 
 #FUN_OK = 1
-#IAM = "DCSS"
+IAM = "DCSS"
 FITS_HDR_CNT = 100
 
 #for simul
 SVC = 0
 H = 1
 K = 2
-
-FROM_INSTSEQ = "InstSeq"
-FROM_ALL = "all"
-FROM_HK = "H_K"
-FROM_DTP = "DTP"
-FROM_OBSAPP = "ObsApp"
-DCSS = "DCSS"
-
 
 FieldNames = [('date', str), ('time', str),
               ('pressure', float),
