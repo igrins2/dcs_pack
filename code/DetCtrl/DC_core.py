@@ -1452,13 +1452,13 @@ class DC(threading.Thread):
             byte = lib.MACIE_AvailableScienceData(self.handle)
             if byte >= (get_byte * frame_cnt):
                 msg = "Available science data = %d bytes, Loop = %d" % (
-                    byte, i)
+                    byte, i*3)
                 self.log.send(self._iam, INFO, msg)                
                 break
 
             log = "Wait....(%d), stop(%d)" % (i, self.stop)
             self.log.send(self._iam, INFO, log)
-            ti.sleep(1)
+            ti.sleep(3)
             #ti.sleep(triggerTimeout / 100 / 1000)
 
         if self.stop:
