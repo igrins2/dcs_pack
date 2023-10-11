@@ -1458,7 +1458,7 @@ class DC(threading.Thread):
 
             log = "Wait....(%d), stop(%d)" % (i, self.stop)
             self.log.send(self._iam, INFO, log)
-            ti.sleep(3)
+            ti.sleep(1)
             #ti.sleep(triggerTimeout / 100 / 1000)
 
         if self.stop:
