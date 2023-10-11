@@ -57,7 +57,7 @@
 	```
 	`# exportfs -s`
 	```
-	$HOME/DCS/Data  192.168.1.10(sync,wdelay,hide,no_subtree_check,sec=sys,rw,secure,no_root_squash,no_all_squash)
+	$HOME/DCS/Data  192.168.1.203(sync,wdelay,hide,no_subtree_check,sec=sys,rw,secure,no_root_squash,no_all_squash)
 	$HOME/DCS/Data  "ip address of TelOps"(sync,wdelay,hide,no_subtree_check,sec=sys,rw,secure,no_root_squash,no_all_squash)
 	```
 	```
