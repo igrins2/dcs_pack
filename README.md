@@ -114,7 +114,7 @@
 	# firewall-cmd --permanent --zone=public --add-port=5672/tcp
 	# firewall-cmd --reload
  	# systemctl stop firewalld.service
-    	# systemctl disable firewalld.service
+ 	# systemctl disable firewalld.service
 	```
 7. Start software
 	```
