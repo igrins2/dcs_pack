@@ -61,7 +61,7 @@
 	$HOME/DCS/Data  "ip address of TelOps"(sync,wdelay,hide,no_subtree_check,sec=sys,rw,secure,no_root_squash,no_all_squash)
 	```
 	```
-        # systemctl start firewalld.service
+ 	# systemctl start firewalld.service
 	# firewall-cmd --permanent --add-service=nfs
 	# firewall-cmd --permanent --add-service=rpc-bind
 	# firewall-cmd --permanent --add-service=mountd
