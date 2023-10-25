@@ -113,12 +113,9 @@
 	```
 	# firewall-cmd --permanent --zone=public --add-port=5672/tcp
 	# firewall-cmd --reload
-	```
- 	- stop and disable firewalld.service
-   	```
-    	# systemctl stop firewalld.service
+ 	# systemctl stop firewalld.service
     	# systemctl disable firewalld.service
-    	```
+	```
 7. Start software
 	```
 	$ sudo systemctl daemon-reload
