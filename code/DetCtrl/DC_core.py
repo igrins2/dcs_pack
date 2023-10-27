@@ -3,7 +3,7 @@
 """
 Created on Mar 4, 2022
 
-Modified on Oct 4, 2023 
+Modified on Oct 27, 2023 
 
 @author: hilee
 """
@@ -223,6 +223,12 @@ class DC(threading.Thread):
         self.connect_to_server_ex()
         self.connect_to_server_q()
 
+        # 20231026 add on-sky images
+        self.onsky_dir = "%s1stOnSky/" % WORKING_DIR
+        _files = os.listdir(self.onsky_dir )
+        self.matching_files = [file for file in _files if file.endswith(".fits")]
+        self.cur_img_cnt = 0
+
         threading.Thread(target=self.control_MACIE).start()
         #self.control_MACIE()
 
@@ -334,83 +340,6 @@ class DC(threading.Thread):
             return
 
         try:
-            if IAM == DCSS and param[1] == FROM_HK:
-                # for simulation
-                if bool(int(param[2])):
-
-                    if self.acquiring:
-                        if where == FROM_DTP:
-                            self.publish_to_ics_queue(CMD_BUSY)
-                            return
-                        elif where == FROM_INSTSEQ or where == FROM_OBSAPP:
-                            self.stop = True
-                            ti.sleep(1)
-
-                    if param[0] == CMD_SETFSPARAM_ICS:
-                        self.expTime_hk = float(param[3])
-                        self.read_hk = int(param[5])
-                                        
-                        msg = "%s %d" % (param[0], True)
-                        self.publish_to_ics_queue(msg)                    
-
-                    elif param[0] == CMD_ACQUIRERAMP_ICS:
-                        self.acquiring = True   #20231006
-                        
-                        next_idx = int(param[3])
-                        measured_startT = ti.time()    
-
-                        _time_measure = self.read_hk*2 + self.expTime_hk
-                        ti.sleep(_time_measure)
-                        
-                        #copy from demo image
-                        
-                        # for H
-                        fitsfullpath_h = "%s/dcs_pack/code/DetCtrl/SDCH_demo.fits" % WORKING_DIR
-                        frm = fits.open(fitsfullpath_h)[0].data
-                        self.loadimg_test[H] = frm[0:FRAME_X*FRAME_Y]
-
-                        # for K
-                        fitsfullpath_k = "%s/dcs_pack/code/DetCtrl/SDCK_demo.fits" % WORKING_DIR
-                        frm = fits.open(fitsfullpath_k)[0].data
-                        self.loadimg_test[K] = frm[0:FRAME_X*FRAME_Y]
-
-                        path = "%s/Data/Fowler/" % self.exe_path
-                        self.createFolder(path)
-                        
-                        _t = datetime.datetime.utcnow()
-                        # for recognization in NFS
-                        _t_nextday = _t + datetime.timedelta(days=1)
-                        folder_name_nextday = "%04d%02d%02d" % (_t_nextday.year, _t_nextday.month, _t_nextday.day)
-                        path_nextday = path + folder_name_nextday + "/"
-                        self.createFolder(path_nextday)
-
-                        cur_datetime = [_t.year, _t.month, _t.day, _t.hour, _t.minute, _t.second, _t.microsecond]
-                        folder_name = "%04d%02d%02d" % (_t.year, _t.month, _t.day)
-                        path += folder_name + "/"
-                        self.createFolder(path)
-                        
-                        path2 = path + str(next_idx) + "/"
-                        self.createFolder(path2)
-
-                        # for H
-                        filename = "SDCH_%s_%04d.fits" % (folder_name, next_idx)
-                        full_path = path + filename
-                        self.save_fitsfile_sub(H, full_path, cur_datetime, 1, 1, self.read_hk, True)
-
-                        # for K
-                        filename = "SDCK_%s_%04d.fits" % (folder_name, next_idx)
-                        full_path = path + filename
-                        self.save_fitsfile_sub(K, full_path, cur_datetime, 1, 1, self.read_hk, True)
-            
-                        measured_durationT = ti.time() - measured_startT
-                        
-                        msg = "%s %.3f %s %d" % (param[0], measured_durationT, folder_name + "/" + filename, True)
-                        self.publish_to_ics_queue(msg)
-
-                        self.acquiring = False
-
-                return    
-            
             #----------------------------------
             # 20231003
             if where == FROM_DTP and not (param[1] == IAM or param[1] == FROM_ALL):
@@ -738,7 +667,10 @@ class DC(threading.Thread):
                     self.fowlerNumber = int(param[4])
                     self.fowlerTime = float(param[5])
 
-                res = self.SetFSParam(1, self.fowlerNumber, 1, self.fowlerTime, 1)
+                if bool(int(param[2])):
+                    res = True
+                else:
+                    res = self.SetFSParam(1, self.fowlerNumber, 1, self.fowlerTime, 1)
                 msg = "%s %d" % (param[0], res)
                 self.publish_to_ics_queue(msg)
 
@@ -754,10 +686,17 @@ class DC(threading.Thread):
                     _time_measure = self.reads*2 + self.expTime
                     ti.sleep(_time_measure)
                     
-                    #copy from demo image
-                    self.fitsfullpath = "%s/dcs_pack/code/DetCtrl/SDC%s_demo.fits" % (WORKING_DIR, IAM[-1])
-                    frm = fits.open(self.fitsfullpath)[0].data
+                    #copy from demo image -> 1st On-Sky images
+                    #self.fitsfullpath = "%s/dcs_pack/code/DetCtrl/SDC%s_demo.fits" % (WORKING_DIR, IAM[-1])
+                    self.fitsfullpath = os.path.join(self.onsky_dir, self.matching_files[self.cur_img_cnt])
+                    
+                    if self.cur_img_cnt == len(self.matching_files)-1:  self.cur_img_cnt = 0
+                    else:                                               self.cur_img_cnt += 1
+
+                    hdul = fits.open(self.fitsfullpath)
+                    frm = hdul[0].data
                     self.loadimg_test[0] = frm[0:FRAME_X*FRAME_Y]
+                    hdul.close()
 
                     path = "%s/Data/Fowler/" % self.exe_path
                     self.createFolder(path)
@@ -1985,7 +1924,7 @@ class DC(threading.Thread):
 
         fits.writeto(fullpath+filename, img, header=new_header, overwrite=True) #, img, header, output_verify='ignore', overwrite=True)
 
-        #hdul.close()
+        hdulist.close()
 
 
     def GetTelemetry(self):
