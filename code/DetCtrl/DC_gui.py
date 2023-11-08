@@ -723,7 +723,7 @@ class MainWindow(Ui_Dialog, QMainWindow):
         self.prog_timer.start()
 
         self.elapsed_timer = QTimer(self)
-        self.elapsed_timer.setInterval(0.001)
+        self.elapsed_timer.setInterval(1)
         self.elapsed_timer.timeout.connect(self.show_elapsed)
         
         self.elapsed = ti.time()

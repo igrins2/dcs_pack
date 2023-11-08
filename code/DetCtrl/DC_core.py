@@ -32,7 +32,8 @@ import tunning as tn
 
 import threading
 
-# -----------------------------------------------------------------------------------------
+from shutil import copyfile
+#-----------------------------------------------------------------------------------------
 # for c++
 # sampling calculation for speed
 lib2 = cdll.LoadLibrary(WORKING_DIR + "dcs_pack/code/FowlerCalculation/libsampling_cal.so")
@@ -181,7 +182,7 @@ class DC(threading.Thread):
         self.resets, self.reads, self.ramps, self.groups, self.drops = 1, 1, 1, 1, 1
         
         self.loadimg = []
-        self.loadimg_test = [[] for _ in range(3)] #for simul
+        #self.loadimg_test = [[] for _ in range(3)] #for simul
 
         self.measured_startT = 0
         self.measured_durationT = 0
@@ -693,10 +694,10 @@ class DC(threading.Thread):
                     if self.cur_img_cnt == len(self.matching_files)-1:  self.cur_img_cnt = 0
                     else:                                               self.cur_img_cnt += 1
 
-                    hdul = fits.open(self.fitsfullpath)
-                    frm = hdul[0].data
-                    self.loadimg_test[0] = frm[0:FRAME_X*FRAME_Y]
-                    hdul.close()
+                    #hdul = fits.open(self.fitsfullpath)
+                    #frm = hdul[0].data
+                    #self.loadimg_test = frm[0:FRAME_X*FRAME_Y]
+                    #hdul.close()
 
                     path = "%s/Data/Fowler/" % self.exe_path
                     self.createFolder(path)
@@ -731,7 +732,8 @@ class DC(threading.Thread):
 
                     filename = "SDC%s_%s_%04d.fits" % (IAM[-1], folder_name, self.next_idx)
                     full_path = path + filename
-                    self.save_fitsfile_sub(0, full_path, cur_datetime, self.ramps, self.groups, self.reads, True)
+                    copyfile(self.fitsfullpath, full_path)
+                    #self.save_fitsfile_sub(0, full_path, cur_datetime, self.ramps, self.groups, self.reads, True)
         
                     measured_durationT = ti.time() - measured_startT
                     
@@ -1615,7 +1617,7 @@ class DC(threading.Thread):
 
 
 
-    def save_fitsfile_sub(self, idx, filename, cur_datetime, ramp, group, read, simul = False):
+    def save_fitsfile_sub(self, idx, filename, cur_datetime, ramp, group, read): #, simul = False):
         try:
 
             header_array = MACIE_FitsHdr * FITS_HDR_CNT
@@ -1862,9 +1864,9 @@ class DC(threading.Thread):
             pHeaders[header_cnt] = MACIE_FitsHdr(key="SEQNNAME".encode(), valType=HDR_STR, sVal=str.encode(), comment="Ramp and Group String".encode())
             header_cnt += 1
 
-            if simul:
-                pHeaders[header_cnt] = MACIE_FitsHdr(key="SIMUL".encode(), valType=HDR_STR, sVal="Simulation mode".encode(), comment="".encode())
-                header_cnt += 1
+            #if simul:
+            #    pHeaders[header_cnt] = MACIE_FitsHdr(key="SIMUL".encode(), valType=HDR_STR, sVal="Simulation mode".encode(), comment="".encode())
+            #    header_cnt += 1
 
             if self.ROIMode:
                 pHeaders[header_cnt] = MACIE_FitsHdr(key="X_START".encode(), valType=HDR_INT, iVal=self.x_start, comment="X start (ROI)".encode())
@@ -1880,10 +1882,11 @@ class DC(threading.Thread):
                 data = arr.ctypes.data_as(POINTER(c_ushort))
                 sts = lib.MACIE_WriteFitsFile(c_char_p(filename.encode()), self.x_stop - self.x_start + 1, self.y_stop - self.y_start + 1, data, header_cnt, pHeaders)
             else:
-                if simul:
-                    arr = np.array(self.loadimg_test[idx], dtype=np.int16)
-                else:        
-                    arr = np.array(self.loadimg[idx], dtype=np.int16)
+                #if simul:
+                #    arr = np.array(self.loadimg_test[idx], dtype=np.int16)
+                #else:        
+                
+                arr = np.array(self.loadimg[idx], dtype=np.int16)
                 data = arr.ctypes.data_as(POINTER(c_ushort))
                 sts = lib.MACIE_WriteFitsFile(c_char_p(filename.encode()), FRAME_X, FRAME_Y, data, header_cnt, pHeaders)
             
