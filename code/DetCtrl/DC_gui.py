@@ -139,7 +139,7 @@ class MainWindow(Ui_Dialog, QMainWindow):
         self.acquiring = False
 
         self.core_timer = QTimer(self)
-        self.core_timer.setInterval(100)
+        self.core_timer.setInterval(1)
         self.core_timer.timeout.connect(self.core_process)
         self.core_timer.start()       
 
