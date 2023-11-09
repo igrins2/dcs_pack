@@ -669,6 +669,10 @@ class DC(threading.Thread):
                             self.expTime = float(param[3])
                             self.fowlerNumber = int(param[4])
                             self.fowlerTime = float(param[5])
+                    else:
+                        self.expTime = float(param[3])
+                        self.fowlerNumber = int(param[4])
+                        self.fowlerTime = float(param[5])
 
                 if bool(int(param[2])):
                     res = True
