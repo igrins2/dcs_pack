@@ -3,7 +3,7 @@
 """
 Created on Mar 4, 2022
 
-Modified on Oct 27, 2023 
+Modified on Nov 9, 2023 
 
 @author: hilee
 """
@@ -664,9 +664,11 @@ class DC(threading.Thread):
 
                 self.samplingMode = FOWLER_MODE
                 if len(param) > 3:
-                    self.expTime = float(param[3])
-                    self.fowlerNumber = int(param[4])
-                    self.fowlerTime = float(param[5])
+                    if param[1] == FROM_ALL:
+                        if IAM != DCSS or (float(param[3]) == 1.63 and float(param[4]) == 1):
+                            self.expTime = float(param[3])
+                            self.fowlerNumber = int(param[4])
+                            self.fowlerTime = float(param[5])
 
                 if bool(int(param[2])):
                     res = True
