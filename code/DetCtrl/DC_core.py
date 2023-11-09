@@ -686,7 +686,8 @@ class DC(threading.Thread):
                     #for simulation
                     measured_startT = ti.time()    
 
-                    _time_measure = self.reads*2 + self.expTime
+                    #_time_measure = self.reads*2 + self.expTime
+                    _time_measure = T_br + (T_frame + self.fowlerTime + (2 * T_frame * self.fowlerNumber))
                     ti.sleep(_time_measure)
                     
                     #copy from demo image -> 1st On-Sky images
