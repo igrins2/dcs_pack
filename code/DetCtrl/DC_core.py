@@ -667,7 +667,6 @@ class DC(threading.Thread):
                     if param[1] == FROM_ALL:
                         if IAM != DCSS or (float(param[3]) == 1.63 and float(param[4]) == 1):
                             self.expTime = float(param[3])
-                            if self.expTime < 1.63: self.expTime = 1.63
                             self.fowlerNumber = int(param[4])
                             self.fowlerTime = float(param[5])
                     else:
