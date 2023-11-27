@@ -671,7 +671,6 @@ class DC(threading.Thread):
                             self.fowlerTime = float(param[5])
                     else:
                         self.expTime = float(param[3])
-                        if self.expTime < 1.63: self.expTime = 1.63
                         self.fowlerNumber = int(param[4])
                         self.fowlerTime = float(param[5])
 
