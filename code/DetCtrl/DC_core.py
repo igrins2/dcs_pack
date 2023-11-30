@@ -3,7 +3,7 @@
 """
 Created on Mar 4, 2022
 
-Modified on Nov 9, 2023 
+Modified on Nov 23, 2023 
 
 @author: hilee
 """
@@ -678,7 +678,7 @@ class DC(threading.Thread):
                     res = True
                 else:
                     res = self.SetFSParam(1, self.fowlerNumber, 1, self.fowlerTime, 1)
-                msg = "%s %d" % (param[0], res)
+                msg = "%s %d %f" % (param[0], res, self.expTime)    # 20231130
                 self.publish_to_ics_queue(msg)
 
                 #print(self.expTime, self.reads)
