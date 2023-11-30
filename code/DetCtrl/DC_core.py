@@ -665,7 +665,8 @@ class DC(threading.Thread):
                 self.samplingMode = FOWLER_MODE
                 if len(param) > 3:
                     if param[1] == FROM_ALL:
-                        if IAM != DCSS or (float(param[3]) == 1.63 and float(param[4]) == 1):
+                        #if IAM != DCSS or (float(param[3]) == 1.63 and float(param[4]) == 1):
+                        if IAM != DCSS:
                             self.expTime = float(param[3])
                             self.fowlerNumber = int(param[4])
                             self.fowlerTime = float(param[5])
