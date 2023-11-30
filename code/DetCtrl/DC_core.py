@@ -634,11 +634,11 @@ class DC(threading.Thread):
                 if bool(int(param[2])):
                     #for simulation
                     #ti.sleep(3)
-                    msg = "%s %d" % (param[0], True)
+                    msg = "%s %d %.3f" % (param[0], True, self.expTime)
                     self.publish_to_ics_queue(msg)
                 else:
                     if self.init2:
-                        msg = "%s %d" % (param[0], True)
+                        msg = "%s %d %.3f" % (param[0], True, self.expTime)
                         self.publish_to_ics_queue(msg)
                     else:
                         self.acquiring = True   #20231006
@@ -655,7 +655,7 @@ class DC(threading.Thread):
                         if res and self.SetDetector(MUX_TYPE, 32) == False:
                             res = False
 
-                        msg = "%s %d" % (param[0], res)
+                        msg = "%s %d %.3f" % (param[0], res, self.expTime)
                         self.publish_to_ics_queue(msg)
 
                         
@@ -678,7 +678,7 @@ class DC(threading.Thread):
                     res = True
                 else:
                     res = self.SetFSParam(1, self.fowlerNumber, 1, self.fowlerTime, 1)
-                msg = "%s %d %f" % (param[0], res, self.expTime)    # 20231130
+                msg = "%s %d %.3f" % (param[0], res, self.expTime)    # 20231130
                 self.publish_to_ics_queue(msg)
 
                 #print(self.expTime, self.reads)
