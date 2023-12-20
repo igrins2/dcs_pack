@@ -3,7 +3,7 @@
 """
 Created on Mar 4, 2022
 
-Modified on Dec 12, 2023 
+Modified on Nov 23, 2023 
 
 @author: hilee
 """
@@ -77,8 +77,7 @@ FieldNames = [('pressure', float),
               ('benchcenter', float), ('coldhead01', float), 
               ('coldhead02', float), ('coldstop', float), 
               ('charcoalBox', float), ('camK', float), 
-              ('shieldtop', float), ('air', float),
-              ('ra', str), ('dec', str), ('airmass', float)]
+              ('shieldtop', float), ('air', float)]
 
 class DC(threading.Thread):
     def __init__(self):
@@ -187,8 +186,6 @@ class DC(threading.Thread):
 
         self.measured_startT = 0
         self.measured_durationT = 0
-
-        self.measured_elapsed = 0
 
         self.full_path = None
 
@@ -1421,8 +1418,6 @@ class DC(threading.Thread):
             self.log.send(self._iam, WARNING, "Trigger timeout: no available science data")
             return False
 
-        self.measured_elapsed = ti.time() - self.measured_startT
-
         arr_list = []
         arr = np.array(arr_list)
         data = arr.ctypes.data_as(POINTER(c_ushort))
@@ -1642,14 +1637,6 @@ class DC(threading.Thread):
             _h, _m, _s, _ms = cur_datetime[3], cur_datetime[4], cur_datetime[5], cur_datetime[6]
             obs_datetime = "%04d-%02d-%02dT%02d:%02d:%02d.%03d" % (y, m, d, _h, _m, _s, _ms)
 
-            #_num = self.macieSN
-            #pHeaders[header_cnt] = MACIE_FitsHdr(key="SERIALN".encode(), valType=HDR_INT, iVal=_num, comment="MACIE serial number".encode())
-            #header_cnt += 1
-
-            detector = "H2RG (%d)" % self.macieSN
-            pHeaders[header_cnt] = MACIE_FitsHdr(key="DETECTOR".encode(), valType=HDR_STR, sVal=detector.encode(), comment="name of Detector (MACIE serial number)".encode())
-            header_cnt += 1
-
             t = Time(obs_datetime, format='isot', scale='utc')
             julian = t.to_value('jd', 'long')
 
@@ -1660,20 +1647,7 @@ class DC(threading.Thread):
             pHeaders[header_cnt] = MACIE_FitsHdr(key="ACQTIME1".encode(), valType=HDR_STR, sVal=obs_datetime.encode(), comment="UTC time (YYYY-MM-DDTHH:MM:SS.MS)".encode())
             header_cnt += 1
 
-            pHeaders[header_cnt] = MACIE_FitsHdr(key="ELAPSED".encode(), valType=HDR_FLOAT, fVal=self.measured_elapsed, comment="Elapsed observation time in seconds".encode())
-            header_cnt += 1
-
-            if IAM == DCSS and self.dewar_info:
-                pHeaders[header_cnt] = MACIE_FitsHdr(key="TELRA".encode(), valType=HDR_STR, sVal=self.dewar_dict['ra'].encode(), comment="Current telescope right ascension".encode())
-                header_cnt += 1
-
-                pHeaders[header_cnt] = MACIE_FitsHdr(key="TELDEC".encode(), valType=HDR_STR, sVal=self.dewar_dict['dec'].encode(), comment="Current telescope declination".encode())
-                header_cnt += 1
-
-                pHeaders[header_cnt] = MACIE_FitsHdr(key="AM".encode(), valType=HDR_FLOAT, fVal=self.dewar_dict['airmass'], comment="Airmass at end of observation".encode())
-                header_cnt += 1
-
-            pHeaders[header_cnt] = MACIE_FitsHdr(key="DATATYPE".encode(), valType=HDR_STR, sVal="ADU".encode(), comment="ADC digital steps".encode())
+            pHeaders[header_cnt] = MACIE_FitsHdr(key="UNITS".encode(), valType=HDR_STR, sVal="ADUs".encode(), comment="ADC digital steps".encode())
             header_cnt += 1
 
             pHeaders[header_cnt] = MACIE_FitsHdr(key="MUXTYPE".encode(), valType=HDR_INT, iVal=MUX_TYPE, comment="1- H1RG; 2- H2RG; 4- H4RG".encode())
@@ -1701,7 +1675,7 @@ class DC(threading.Thread):
             pHeaders[header_cnt] = MACIE_FitsHdr(key="EXPTIME".encode(), valType=HDR_FLOAT, fVal=self.expTime, comment="sec, Exposure Time".encode())
             header_cnt += 1
             
-            pHeaders[header_cnt] = MACIE_FitsHdr(key="FOWLTIME".encode(), valType=HDR_FLOAT, fVal=self.fowlerTime, comment="sec, Time between set fowler sampling".encode())
+            pHeaders[header_cnt] = MACIE_FitsHdr(key="FOWLTIME".encode(), valType=HDR_FLOAT, fVal=self.fowlerTime, comment="sec, Fowler Time".encode())
             header_cnt += 1
 
             if self.ROIMode:
@@ -1735,7 +1709,11 @@ class DC(threading.Thread):
             #-------------------------------------------------------------------------------------
             #information
             _name = IAM[-1]
-            pHeaders[header_cnt] = MACIE_FitsHdr(key="FILTER".encode(), valType=HDR_STR, sVal=_name.encode(), comment="Band name".encode())
+            pHeaders[header_cnt] = MACIE_FitsHdr(key="BAND".encode(), valType=HDR_STR, sVal=_name.encode(), comment="Band name".encode())
+            header_cnt += 1
+            
+            _num = self.macieSN
+            pHeaders[header_cnt] = MACIE_FitsHdr(key="SERIALN".encode(), valType=HDR_INT, iVal=_num, comment="MACIE serial number".encode())
             header_cnt += 1
 
             #pHeaders[header_cnt] = MACIE_FitsHdr(key="FIRMSLOT".encode(), valType=HDR_STR, sVal=self.pCard[self.slctCard].contents.firmwareSlot1, comment="MACIE slot id".encode())
@@ -1950,7 +1928,7 @@ class DC(threading.Thread):
         
         new_header["NSAMP"] = (sampling, "Number of Fowler Sampling")
         
-        #new_header["COMMENT"] = "This FITS file may contain long string keyword values that are continued over multiple keywords. This convention uses the '&' character at the end of a string which is then continued on subsequent keywords whose name = 'CONTINUE"
+        new_header["COMMENT"] = "This FITS file may contain long string keyword values that are continued over multiple keywords. This convention uses the '&' character at the end of a string which is then continued on subsequent keywords whose name = 'CONTINUE"
 
         new_header["FITSFILE"] = fullpath
         new_header["CONTINUE"] = filename                
