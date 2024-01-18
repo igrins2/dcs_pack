@@ -3,7 +3,7 @@
 """
 Created on Mar 4, 2022
 
-Modified on Jan 4, 2024 
+Modified on Dec 12, 2023 
 
 @author: hilee
 """
@@ -688,12 +688,7 @@ class DC(threading.Thread):
                 #print(self.expTime, self.reads)
 
             elif param[0] == CMD_ACQUIRERAMP_ICS:
-                #change 20240104
-                #self.next_idx = int(param[3])
-                if IAM != DCSS:
-                    self.next_idx = int(param[3])
-                else:
-                    self.next_idx = 0
+                self.next_idx = int(param[3])
                 
                 if bool(int(param[2])):
                     #for simulation
@@ -763,7 +758,7 @@ class DC(threading.Thread):
                     if self.AcquireRamp() == False:
                         res = False
                     if self.ImageAcquisition() == False:
-                        res = False
+                        res = True
                     
                     msg = "%s %.3f %s %d" % (param[0], self.measured_durationT, self.folder_name, res)
                     self.publish_to_ics_queue(msg)
@@ -1651,9 +1646,9 @@ class DC(threading.Thread):
             #pHeaders[header_cnt] = MACIE_FitsHdr(key="SERIALN".encode(), valType=HDR_INT, iVal=_num, comment="MACIE serial number".encode())
             #header_cnt += 1
 
-            #detector = "H2RG (%d)" % self.macieSN
-            #pHeaders[header_cnt] = MACIE_FitsHdr(key="DETECTOR".encode(), valType=HDR_STR, sVal=detector.encode(), comment="name of Detector (MACIE serial number)".encode())
-            #header_cnt += 1
+            detector = "H2RG (%d)" % self.macieSN
+            pHeaders[header_cnt] = MACIE_FitsHdr(key="DETECTOR".encode(), valType=HDR_STR, sVal=detector.encode(), comment="name of Detector (MACIE serial number)".encode())
+            header_cnt += 1
 
             t = Time(obs_datetime, format='isot', scale='utc')
             julian = t.to_value('jd', 'long')
