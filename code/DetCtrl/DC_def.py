@@ -3,7 +3,7 @@
 """
 Created on Mar 4, 2022
 
-Modified on May 8, 2023
+Modified on Oct 4, 2023
 
 @author: hilee
 """
@@ -23,8 +23,21 @@ except:
     IAM = user.upper()
 
 #FUN_OK = 1
-IAM = "DCSS"
-FITS_HDR_CNT = 50
+#IAM = "DCSS"
+FITS_HDR_CNT = 100
+
+#for simul
+SVC = 0
+H = 1
+K = 2
+
+FROM_INSTSEQ = "InstSeq"
+FROM_ALL = "all"
+FROM_HK = "H_K"
+FROM_DTP = "DTP"
+FROM_OBSAPP = "ObsApp"
+DCSS = "DCSS"
+
 
 FieldNames = [('date', str), ('time', str),
               ('pressure', float),
@@ -83,9 +96,10 @@ CDSNOISE_MODE = 2
 FOWLER_MODE = 3
 
 T_frame = 1.45479
-T_exp = 1.63
+T_exp = 1.623
 T_minFowler = 0.168
 T_br = 2
+N_fowler_max = 16
 
 MACIE_Reg = 0x0300
 MACIE_Block_Reg = 0x321
@@ -107,7 +121,7 @@ ASICAddr_HxRGNumOutVal = 0x4011
 ASICAddr_HxRGExpModeVal = 0x4018    #exposure mode
 ASICAddr_ASICInputRefVal = 0x4019
 ASICAddr_ASICPreAmpGainVal = 0x401a
-ASICAddr_WinArr = 0x4020
+ASICAddr_WinArr = [0x4020, 0x4021, 0x4022, 0x4023]
 
 ASICAddr_PreAmpReg1Ch1ENAddr = 0x5100
 
@@ -116,7 +130,7 @@ ASICAddr_State = 0x6900
 
 UPLOAD_Q = "UploadDBQ"    #uploader
 
-OBSAPP_BUSY = "ObsAppBusy"
+#OBSAPP_BUSY = "ObsAppBusy"
 
 CMD_SIMULATION = "Simulation"
 CMD_VERSION = "LibVersion"
@@ -140,9 +154,12 @@ CMD_WRITEASICREG = "writeASICreg"
 CMD_READASICREG = "readASICreg"
 CMD_GETTELEMETRY = "GetTelemetry"
 
-ALIVE = "Alive"
+CMD_BUSY = "Busy"
+
+#ALIVE = "Alive"
 
 CMD_INIT2_DONE = "Initialize2_Done"
 CMD_INITIALIZE2_ICS = "Initialize2_ics"
 CMD_SETFSPARAM_ICS = "SetFSParam_ics"
 CMD_ACQUIRERAMP_ICS = "ACQUIRERAMP_ics"
+CMD_RESTART = "Restart"

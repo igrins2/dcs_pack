@@ -145,7 +145,7 @@
    <widget class="QLineEdit" name="e_fowler_number">
     <property name="geometry">
      <rect>
-      <x>125</x>
+      <x>115</x>
       <y>120</y>
       <width>61</width>
       <height>23</height>
@@ -161,7 +161,7 @@
    <widget class="QLineEdit" name="e_exp_time">
     <property name="geometry">
      <rect>
-      <x>125</x>
+      <x>115</x>
       <y>90</y>
       <width>61</width>
       <height>23</height>
@@ -177,7 +177,7 @@
    <widget class="QLabel" name="label_fowler_number">
     <property name="geometry">
      <rect>
-      <x>30</x>
+      <x>20</x>
       <y>120</y>
       <width>91</width>
       <height>21</height>
@@ -196,7 +196,7 @@
    <widget class="QLabel" name="label_13">
     <property name="geometry">
      <rect>
-      <x>30</x>
+      <x>20</x>
       <y>90</y>
       <width>91</width>
       <height>21</height>
@@ -332,36 +332,10 @@
      <set>Qt::AlignCenter</set>
     </property>
    </widget>
-   <widget class="QRadioButton" name="radio_exp_time">
-    <property name="geometry">
-     <rect>
-      <x>10</x>
-      <y>90</y>
-      <width>21</width>
-      <height>25</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string/>
-    </property>
-   </widget>
-   <widget class="QRadioButton" name="radio_fowler_number">
-    <property name="geometry">
-     <rect>
-      <x>10</x>
-      <y>120</y>
-      <width>21</width>
-      <height>25</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string/>
-    </property>
-   </widget>
    <widget class="QLineEdit" name="e_repeat">
     <property name="geometry">
      <rect>
-      <x>200</x>
+      <x>190</x>
       <y>120</y>
       <width>51</width>
       <height>23</height>
@@ -377,7 +351,7 @@
    <widget class="QLabel" name="label_16">
     <property name="geometry">
      <rect>
-      <x>195</x>
+      <x>185</x>
       <y>90</y>
       <width>61</width>
       <height>21</height>
@@ -399,7 +373,7 @@
    <widget class="Line" name="line_2">
     <property name="geometry">
      <rect>
-      <x>183</x>
+      <x>173</x>
       <y>95</y>
       <width>21</width>
       <height>45</height>
@@ -1326,7 +1300,7 @@
      </rect>
     </property>
     <property name="text">
-     <string>2047</string>
+     <string>99</string>
     </property>
     <property name="alignment">
      <set>Qt::AlignCenter</set>
@@ -1399,7 +1373,7 @@
      </rect>
     </property>
     <property name="text">
-     <string>2047</string>
+     <string>99</string>
     </property>
     <property name="alignment">
      <set>Qt::AlignCenter</set>
@@ -1969,11 +1943,6 @@
       <height>23</height>
      </rect>
     </property>
-    <property name="font">
-     <font>
-      <pointsize>1</pointsize>
-     </font>
-    </property>
     <property name="alignment">
      <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
     </property>
@@ -2088,9 +2057,7 @@
   <tabstop>e_groups</tabstop>
   <tabstop>e_drops</tabstop>
   <tabstop>e_ramps</tabstop>
-  <tabstop>radio_exp_time</tabstop>
   <tabstop>e_exp_time</tabstop>
-  <tabstop>radio_fowler_number</tabstop>
   <tabstop>e_fowler_number</tabstop>
   <tabstop>e_repeat</tabstop>
   <tabstop>btn_acquireramp</tabstop>

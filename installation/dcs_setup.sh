@@ -20,7 +20,7 @@ sudo cp $HOME/dcs_pack/installation/macie_v5.3_centos/MacieApp/51-ftd3xx.rules /
 sudo udevadm control --reload-rules
 
 sudo sysctl -w net.core.rmem_max="134000000"
-sudo firewall-cmd --zone=trusted --change-interface=ens160
+#sudo firewall-cmd --zone=trusted --change-interface=ens160
 
 export LD_LIBRARY_PATH=$HOME/macie_v5.3_centos/MacieApp/
 export PATH=$PATH:$HOME/macie_v5.3_centos/MacieApp/
