@@ -24,6 +24,7 @@ sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
 import Libs.SetConfig as sc
 from Libs.MsgMiddleware import *
 from Libs.logger import *
+from Libs.add_wcs_header import update_header2
 
 from MACIE import *
 from DC_def import *
@@ -78,7 +79,10 @@ FieldNames = [('pressure', float),
               ('coldhead02', float), ('coldstop', float), 
               ('charcoalBox', float), ('camK', float), 
               ('shieldtop', float), ('air', float),
-              ('ra', str), ('dec', str), ('airmass', float)]
+              ('ra', str), ('dec', str), ('airmass', float),
+              #add 20240118
+              ('flip', int), ('slitcenX', int), ('slitcenY', int), 
+              ('pa', float), ('pixelscale', float)]  
 
 class DC(threading.Thread):
     def __init__(self):
@@ -1958,9 +1962,24 @@ class DC(threading.Thread):
         #new_header["COMMENT"] = "This FITS file may contain long string keyword values that are continued over multiple keywords. This convention uses the '&' character at the end of a string which is then continued on subsequent keywords whose name = 'CONTINUE"
 
         new_header["FITSFILE"] = fullpath
-        new_header["CONTINUE"] = filename                
+        new_header["CONTINUE"] = filename        
+        
+        #add 20240118 wcs
+        
+        flip = bool(self.dewar_dict['flip'])
+        cx = self.dewar_dict['slitcenX']
+        cy = self.dewar_dict['slitcenY']
+        pa = self.dewar_dict['pa']
+        pixelscale = self.dewar_dict['pixelscale'] / 3600.
+        
+        update_header2(new_header, cx, cy, pa, pixelscale)    
+                
+        if flip:
+            slit_image_flip_func = lambda im: np.rot90(im, 2) #np.fliplr(np.rot90(im))
+        else:
+            slit_image_flip_func = lambda im: im #np.rot90(im)
 
-        fits.writeto(fullpath+filename, img, header=new_header, overwrite=True) #, img, header, output_verify='ignore', overwrite=True)
+        fits.writeto(fullpath+filename, slit_image_flip_func(img), header=new_header, overwrite=True) #, img, header, output_verify='ignore', overwrite=True)
 
         hdulist.close()
 
