@@ -41,7 +41,8 @@ def update_header2(header, crpix1, crpix2, pa, pixelscale):
         ra_deg, dec_deg = np.nan, np.nan
 
     try:
-        pa = header["PASTART"] - 135
+        #pa = header["PASTART"] - 135
+        pa = 225 - pa
     except TypeError:
         pa = np.nan
 

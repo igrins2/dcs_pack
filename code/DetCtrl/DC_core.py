@@ -3,7 +3,7 @@
 """
 Created on Mar 4, 2022
 
-Modified on Jan 4, 2024 
+Modified on Feb 20, 2024 
 
 @author: hilee
 """
@@ -81,7 +81,8 @@ FieldNames = [('pressure', float),
               ('shieldtop', float), ('air', float),
               ('ra', str), ('dec', str), ('airmass', float),
               #add 20240118
-              ('flip', int), ('slitcenX', int), ('slitcenY', int), 
+              #('flip', int),
+              ('slitcenX', int), ('slitcenY', int), 
               ('pa', float), ('pixelscale', float)]  
 
 class DC(threading.Thread):
@@ -212,7 +213,8 @@ class DC(threading.Thread):
         self.dewar_info = False
 
         self.param = None
-        #self.where = ""
+
+        self.publshing = False
 
         ti.sleep(5)
 
@@ -239,6 +241,9 @@ class DC(threading.Thread):
 
         threading.Thread(target=self.control_MACIE).start()
         #self.control_MACIE()
+
+        self.publish_heartbeat()
+
 
     def __del__(self):
         
@@ -267,12 +272,29 @@ class DC(threading.Thread):
         self.producer[ICS].connect_to_server()
         self.producer[ICS].define_producer()
         
-        
-    def publish_to_ics_queue(self, msg):
-        if self.producer[ICS] == None:
+
+    def publish_heartbeat(self):
+        if self.producer[ICS] == None or self.publshing:
+            threading.Timer(2, self.publish_heartbeat).start()
             return
         
+        self.publshing = True
+        self.producer[ICS].send_message(self.dcs_q, HEART_BEAT)
+        self.publshing = False
+        
+        msg = "%s -> [ICS]" % HEART_BEAT
+        self.log.send(IAM, DEBUG, msg)
+        
+        threading.Timer(60, self.publish_heartbeat).start()
+
+        
+    def publish_to_ics_queue(self, msg):
+        if self.producer[ICS] == None or self.publshing:
+            return
+        
+        self.publshing = True
         self.producer[ICS].send_message(self.dcs_q, msg)
+        self.publshing = False
         
         msg = "%s -> [ICS]" % msg
         self.log.send(IAM, INFO, msg)
@@ -381,7 +403,6 @@ class DC(threading.Thread):
                     ti.sleep(1)
 
             self.param = cmd
-            #self.where = where
                     
         except:
             self.log.send(self._iam, WARNING, "parsing error")
@@ -406,9 +427,6 @@ class DC(threading.Thread):
         #print("uploader:", param)
         if len(param) < 2:
             return
-        
-        msg = "<- [DB uploader] %s" % cmd
-        self.log.send(self._iam, INFO, msg)
 
         try:
             if param[0] == UPLOAD_Q:
@@ -418,6 +436,9 @@ class DC(threading.Thread):
 
                 self.dewar_dict = dict((k, t(v)) for (k, t), v in zip(FieldNames, dewar_list))
                 self.dewar_info = True
+
+                msg = "<- [DB uploader] %s" % cmd
+                self.log.send(self._iam, INFO, msg)
                 
         except:
             self.log.send(self._iam, WARNING, "parsing error")
@@ -729,7 +750,6 @@ class DC(threading.Thread):
                     path_nextday = path + folder_name_nextday + "/"
                     self.createFolder(path_nextday)
 
-                    cur_datetime = [_t.year, _t.month, _t.day, _t.hour, _t.minute, _t.second, _t.microsecond]
                     folder_name = "%04d%02d%02d" % (_t.year, _t.month, _t.day)
                     path += folder_name + "/"
                     self.createFolder(path)
@@ -752,8 +772,37 @@ class DC(threading.Thread):
 
                     filename = "SDC%s_%s_%04d.fits" % (IAM[-1], folder_name, self.next_idx)
                     full_path = path + filename
-                    copyfile(self.fitsfullpath, full_path)
-                    #self.save_fitsfile_sub(0, full_path, cur_datetime, self.ramps, self.groups, self.reads, True)
+
+                    # add 20240130 for WCS
+                    hdul = fits.open(self.fitsfullpath)
+                    _data = hdul[0].data
+                    _header = hdul[0].header
+                    _img = np.array(_data, dtype = "f")
+
+                    #add 20240118 wcs
+                    #flip = bool(self.dewar_dict['flip'])
+                    cx = self.dewar_dict['slitcenX']
+                    cy = self.dewar_dict['slitcenY']
+                    pa = self.dewar_dict['pa']
+                    pixelscale = self.dewar_dict['pixelscale'] / 3600.
+
+                    # add 20240205
+                    _header["RADECSYS"] = ("FK5", "Coordinate System")
+                    _header["TELEPOCH"] = (2000.0, "Current telescope epoch")
+                    _header["IPA"] = (pa, "Instrument position angle")
+                    
+                    update_header2(_header, cx, cy, pa, pixelscale)    
+                            
+                    #if flip:
+                    #    slit_image_flip_func = lambda im: np.rot90(im, 2) 
+                    #else:
+                    #    slit_image_flip_func = lambda im: im
+
+                    fits.writeto(full_path, _img, header=_header, output_verify="ignore", overwrite=True) 
+
+                    hdul.close()
+                    
+                    #copyfile(self.fitsfullpath, full_path)
         
                     measured_durationT = ti.time() - measured_startT
                     
@@ -1462,7 +1511,7 @@ class DC(threading.Thread):
 
 
         
-    def WriteFitsFile(self, local = True):
+    def WriteFitsFile(self):
 
         if self.ROIMode:
             self.log.send(self._iam, INFO, "Write Fits file now (ROI)....")
@@ -1964,22 +2013,26 @@ class DC(threading.Thread):
         new_header["FITSFILE"] = fullpath
         new_header["CONTINUE"] = filename        
         
-        #add 20240118 wcs
-        
-        flip = bool(self.dewar_dict['flip'])
-        cx = self.dewar_dict['slitcenX']
-        cy = self.dewar_dict['slitcenY']
-        pa = self.dewar_dict['pa']
-        pixelscale = self.dewar_dict['pixelscale'] / 3600.
-        
-        update_header2(new_header, cx, cy, pa, pixelscale)    
-                
-        if flip:
-            slit_image_flip_func = lambda im: np.rot90(im, 2) #np.fliplr(np.rot90(im))
-        else:
-            slit_image_flip_func = lambda im: im #np.rot90(im)
+        if IAM == DCSS and self.dewar_info:
+            #add 20240118 wcs
+            cx = self.dewar_dict['slitcenX']
+            cy = self.dewar_dict['slitcenY']
+            pa = self.dewar_dict['pa']
+            pixelscale = self.dewar_dict['pixelscale'] / 3600.
 
-        fits.writeto(fullpath+filename, slit_image_flip_func(img), header=new_header, overwrite=True) #, img, header, output_verify='ignore', overwrite=True)
+            # add 20240205
+            new_header["RADECSYS"] = ("FK5", "Coordinate System")
+            new_header["TELEPOCH"] = (2000.0, "Current telescope epoch")
+            new_header["IPA"] = (pa, "Instrument position angle")
+            
+            update_header2(new_header, cx, cy, pa, pixelscale)    
+                
+        #if flip:
+        #    slit_image_flip_func = lambda im: np.rot90(im, 2) #np.fliplr(np.rot90(im))
+        #else:
+        #    slit_image_flip_func = lambda im: im #np.rot90(im)
+
+        fits.writeto(fullpath+filename, img, header=new_header, overwrite=True) #, img, header, output_verify='ignore', overwrite=True)
 
         hdulist.close()
 
