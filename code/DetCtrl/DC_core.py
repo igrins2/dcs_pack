@@ -779,24 +779,25 @@ class DC(threading.Thread):
                     _header = hdul[0].header
                     _img = np.array(_data, dtype = "f")
 
-                    #add 20240118 wcs
-                    #flip = bool(self.dewar_dict['flip'])
-                    cx = self.dewar_dict['slitcenX']
-                    cy = self.dewar_dict['slitcenY']
-                    pa = self.dewar_dict['pa']
-                    pixelscale = self.dewar_dict['pixelscale'] / 3600.
+                    if IAM == DCSS and self.dewar_info: 
+                        #add 20240118 wcs
+                        #flip = bool(self.dewar_dict['flip'])
+                        cx = self.dewar_dict['slitcenX']
+                        cy = self.dewar_dict['slitcenY']
+                        pa = self.dewar_dict['pa']
+                        pixelscale = self.dewar_dict['pixelscale'] / 3600.
 
-                    # add 20240205
-                    _header["RADECSYS"] = ("FK5", "Coordinate System")
-                    _header["TELEPOCH"] = (2000.0, "Current telescope epoch")
-                    _header["IPA"] = (pa, "Instrument position angle")
-                    
-                    update_header2(_header, cx, cy, pa, pixelscale)    
-                            
-                    #if flip:
-                    #    slit_image_flip_func = lambda im: np.rot90(im, 2) 
-                    #else:
-                    #    slit_image_flip_func = lambda im: im
+                        # add 20240205
+                        _header["RADECSYS"] = ("FK5", "Coordinate System")
+                        _header["TELEPOCH"] = (2000.0, "Current telescope epoch")
+                        _header["IPA"] = (pa, "Instrument position angle")
+                        
+                        update_header2(_header, cx, cy, pa, pixelscale)    
+                                
+                        #if flip:
+                        #    slit_image_flip_func = lambda im: np.rot90(im, 2) 
+                        #else:
+                        #    slit_image_flip_func = lambda im: im
 
                     fits.writeto(full_path, _img, header=_header, output_verify="ignore", overwrite=True) 
 
