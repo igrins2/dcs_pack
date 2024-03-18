@@ -8,6 +8,9 @@ def update_header(header, ra_deg, dec_deg, crpix1, crpix2, pa, pixelscale):
     # dec_deg = Angle(dec, unit="degree").degree
     # pa = header["PASTART"] - 135
 
+    #modify 20240312 by hilee
+    
+    '''
     h = dict(CTYPE1="RA---TAN",
              CTYPE2="DEC--TAN",
              CDELT1=-pixelscale,
@@ -18,6 +21,23 @@ def update_header(header, ra_deg, dec_deg, crpix1, crpix2, pa, pixelscale):
              CRVAL2=dec_deg,
              CROTA1=pa,
              CROTA2=pa)
+    '''
+
+    CDELT1=-pixelscale
+    CDELT2=pixelscale
+    CROTA1=pa
+    CROTA2=pa
+
+    h = dict(CTYPE1="RA---TAN",
+             CTYPE2="DEC--TAN",
+             CRPIX1=crpix1,
+             CRPIX2=crpix2,
+             CRVAL1=ra_deg,
+             CRVAL2=dec_deg,
+             CD1_1=CDELT1*np.cos(np.deg2rad(CROTA2)),
+             CD1_2=-CDELT2*np.sin(np.deg2rad(CROTA2)),
+             CD2_1=CDELT1*np.sin(np.deg2rad(CROTA2)),
+             CD2_2=CDELT2*np.cos(np.deg2rad(CROTA2)))
 
     for k, v in h.items():
         if isinstance(v, float) and np.isnan(v):

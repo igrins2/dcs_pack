@@ -3,7 +3,7 @@
 """
 Created on Mar 4, 2022
 
-Modified on Feb 20, 2024 
+Modified on March 12, 2024 
 
 @author: hilee
 """
@@ -193,7 +193,9 @@ class DC(threading.Thread):
         self.measured_startT = 0
         self.measured_durationT = 0
 
-        self.measured_elapsed = 0
+        #self.measured_elapsed = 0
+        self.obs_startT = 0
+        self.obs_endT = 0
 
         self.full_path = None
 
@@ -722,11 +724,16 @@ class DC(threading.Thread):
                 
                 if bool(int(param[2])):
                     #for simulation
-                    measured_startT = ti.time()    
+                    #modify 20240312
+                    measured_startT = ti.time() 
+                    obs_startT = datetime.datetime.utcnow()   
 
                     #_time_measure = self.reads*2 + self.expTime
                     _time_measure = T_br + (T_frame + self.fowlerTime + (2 * T_frame * self.fowlerNumber))
                     ti.sleep(_time_measure)
+
+                    #add 20240312
+                    obs_endT = datetime.datetime.utcnow()
                     
                     #copy from demo image -> 1st On-Sky images
                     #self.fitsfullpath = "%s/dcs_pack/code/DetCtrl/SDC%s_demo.fits" % (WORKING_DIR, IAM[-1])
@@ -778,6 +785,15 @@ class DC(threading.Thread):
                     _data = hdul[0].data
                     _header = hdul[0].header
                     _img = np.array(_data, dtype = "f")
+
+                    #add 20240312
+                    _t = obs_startT
+                    _obs_start_t = "%02d:%02d:%02d.%04d" % (_t.hour, _t.minute, _t.second, _t.microsecond)
+                    _header["UTSTART"] = (_obs_start_t, "UT at observation start")
+
+                    _t = obs_endT
+                    _obs_end_t = "%02d:%02d:%02d.%04d" % (_t.hour, _t.minute, _t.second, _t.microsecond)
+                    _header["UTEND"] = (_obs_end_t, "UT at observation end")
 
                     if IAM == DCSS and self.dewar_info: 
                         #add 20240118 wcs
@@ -1307,6 +1323,8 @@ class DC(threading.Thread):
         self.stop = False
 
         self.measured_startT = ti.time()
+        #add 20240312
+        self.obs_startT = datetime.datetime.utcnow()
 
         self.log.send(self._iam, INFO, "Acquire Science Data....")
 
@@ -1391,6 +1409,9 @@ class DC(threading.Thread):
     def AcquireRamp_window(self):
 
         self.measured_startT = ti.time()
+        #add 20240312
+        self.obs_startT = datetime.datetime.utcnow()
+
         try:
             cfg = sc.LoadConfig(WORKING_DIR + "DCS/DCS.ini")
             self.preampInputScheme = int(cfg.get("DC", 'preampInputScheme'))   #1
@@ -1480,7 +1501,9 @@ class DC(threading.Thread):
             self.log.send(self._iam, WARNING, "Trigger timeout: no available science data")
             return False
 
-        self.measured_elapsed = ti.time() - self.measured_startT
+        #modify 20240312
+        #self.measured_elapsed = ti.time() - self.measured_startT
+        self.measured_endT = datetime.datetime.utcnow()
 
         arr_list = []
         arr = np.array(arr_list)
@@ -1719,8 +1742,18 @@ class DC(threading.Thread):
             pHeaders[header_cnt] = MACIE_FitsHdr(key="ACQTIME1".encode(), valType=HDR_STR, sVal=obs_datetime.encode(), comment="UTC time (YYYY-MM-DDTHH:MM:SS.MS)".encode())
             header_cnt += 1
 
-            pHeaders[header_cnt] = MACIE_FitsHdr(key="ELAPSED".encode(), valType=HDR_FLOAT, fVal=self.measured_elapsed, comment="Elapsed observation time in seconds".encode())
+            #--------------------------------------------------------------------------------------
+            #modify 20240312
+            _t = self.obs_startT
+            _obs_start_t = "%02d:%02d:%02d.%04d" % (_t.hour, _t.minute, _t.second, _t.microsecond)
+            pHeaders[header_cnt] = MACIE_FitsHdr(key="UTSTART".encode(), valType=HDR_STR, fVal=_obs_start_t.encode(), comment="UT at observation start".encode())
             header_cnt += 1
+
+            _t = self.obs_endT
+            _obs_end_t = "%02d:%02d:%02d.%04d" % (_t.hour, _t.minute, _t.second, _t.microsecond)
+            pHeaders[header_cnt] = MACIE_FitsHdr(key="UTEND".encode(), valType=HDR_STR, fVal=_obs_end_t.encode(), comment="UT at observation end".encode())
+            header_cnt += 1
+            #--------------------------------------------------------------------------------------
 
             if IAM == DCSS and self.dewar_info:
                 pHeaders[header_cnt] = MACIE_FitsHdr(key="TELRA".encode(), valType=HDR_STR, sVal=self.dewar_dict['ra'].encode(), comment="Current telescope right ascension".encode())
