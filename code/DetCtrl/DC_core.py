@@ -1746,12 +1746,12 @@ class DC(threading.Thread):
             #modify 20240312
             _t = self.obs_startT
             _obs_start_t = "%02d:%02d:%02d.%04d" % (_t.hour, _t.minute, _t.second, _t.microsecond)
-            pHeaders[header_cnt] = MACIE_FitsHdr(key="UTSTART".encode(), valType=HDR_STR, fVal=_obs_start_t.encode(), comment="UT at observation start".encode())
+            pHeaders[header_cnt] = MACIE_FitsHdr(key="UTSTART".encode(), valType=HDR_STR, sVal=_obs_start_t.encode(), comment="UT at observation start".encode())
             header_cnt += 1
 
             _t = self.obs_endT
             _obs_end_t = "%02d:%02d:%02d.%04d" % (_t.hour, _t.minute, _t.second, _t.microsecond)
-            pHeaders[header_cnt] = MACIE_FitsHdr(key="UTEND".encode(), valType=HDR_STR, fVal=_obs_end_t.encode(), comment="UT at observation end".encode())
+            pHeaders[header_cnt] = MACIE_FitsHdr(key="UTEND".encode(), valType=HDR_STR, sVal=_obs_end_t.encode(), comment="UT at observation end".encode())
             header_cnt += 1
             #--------------------------------------------------------------------------------------
 
