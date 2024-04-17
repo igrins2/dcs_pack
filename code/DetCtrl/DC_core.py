@@ -1503,7 +1503,7 @@ class DC(threading.Thread):
 
         #modify 20240312
         #self.measured_elapsed = ti.time() - self.measured_startT
-        self.measured_endT = datetime.datetime.utcnow()
+        self.obs_endT = datetime.datetime.utcnow()
 
         arr_list = []
         arr = np.array(arr_list)
