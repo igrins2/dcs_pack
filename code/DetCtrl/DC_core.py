@@ -3,15 +3,15 @@
 """
 Created on Mar 4, 2022
 
-Modified on Jan 4, 2024 
+Modified on March 12, 2024 
 
 @author: hilee
 """
-
 #import subprocess
 import numpy as np
 import astropy.io.fits as fits
 from astropy.time import Time
+import traceback
 
 #from ctypes import *
 from math import *
@@ -24,6 +24,7 @@ sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
 import Libs.SetConfig as sc
 from Libs.MsgMiddleware import *
 from Libs.logger import *
+from Libs.add_wcs_header import update_header2
 
 from MACIE import *
 from DC_def import *
@@ -78,7 +79,12 @@ FieldNames = [('pressure', float),
               ('coldhead02', float), ('coldstop', float), 
               ('charcoalBox', float), ('camK', float), 
               ('shieldtop', float), ('air', float),
-              ('ra', str), ('dec', str), ('airmass', float)]
+              ('ra', str), ('dec', str), ('airmass', float),
+              #add 20240118
+              #('flip', int),
+              ('slitcenX', int), ('slitcenY', int), 
+              ('pa', float), ('pixelscale', float), 
+              ('ra2', float), ('dec2', float)]  
 
 class DC(threading.Thread):
     def __init__(self):
@@ -138,6 +144,13 @@ class DC(threading.Thread):
         self.exe_path = WORKING_DIR + self.exe_path
 
         self.gige_timeout = cfg.get('DC', 'timeout')
+
+        # add 20240419, modify 20240422
+        global CRPIX_REF
+        if IAM == DCSS:
+            tmp = cfg.get('DC', 'crpix-ref').split(',')
+            CRPIX_REF = float(tmp[0]), float(tmp[1])
+   
         #-------------------------------------------------------
 
         self.handle = 0
@@ -188,7 +201,9 @@ class DC(threading.Thread):
         self.measured_startT = 0
         self.measured_durationT = 0
 
-        self.measured_elapsed = 0
+        #self.measured_elapsed = 0
+        self.obs_startT = 0
+        self.obs_endT = 0
 
         self.full_path = None
 
@@ -208,7 +223,8 @@ class DC(threading.Thread):
         self.dewar_info = False
 
         self.param = None
-        #self.where = ""
+
+        self.publshing = False
 
         ti.sleep(5)
 
@@ -235,6 +251,9 @@ class DC(threading.Thread):
 
         threading.Thread(target=self.control_MACIE).start()
         #self.control_MACIE()
+
+        self.publish_heartbeat()
+
 
     def __del__(self):
         
@@ -263,12 +282,29 @@ class DC(threading.Thread):
         self.producer[ICS].connect_to_server()
         self.producer[ICS].define_producer()
         
-        
-    def publish_to_ics_queue(self, msg):
-        if self.producer[ICS] == None:
+
+    def publish_heartbeat(self):
+        if self.producer[ICS] == None or self.publshing:
+            threading.Timer(2, self.publish_heartbeat).start()
             return
         
+        self.publshing = True
+        self.producer[ICS].send_message(self.dcs_q, HEART_BEAT)
+        self.publshing = False
+        
+        msg = "%s -> [ICS]" % HEART_BEAT
+        self.log.send(IAM, DEBUG, msg)
+        
+        threading.Timer(30, self.publish_heartbeat).start()
+
+        
+    def publish_to_ics_queue(self, msg):
+        if self.producer[ICS] == None or self.publshing:
+            return
+        
+        self.publshing = True
         self.producer[ICS].send_message(self.dcs_q, msg)
+        self.publshing = False
         
         msg = "%s -> [ICS]" % msg
         self.log.send(IAM, INFO, msg)
@@ -377,7 +413,6 @@ class DC(threading.Thread):
                     ti.sleep(1)
 
             self.param = cmd
-            #self.where = where
                     
         except:
             self.log.send(self._iam, WARNING, "parsing error")
@@ -402,9 +437,6 @@ class DC(threading.Thread):
         #print("uploader:", param)
         if len(param) < 2:
             return
-        
-        msg = "<- [DB uploader] %s" % cmd
-        self.log.send(self._iam, INFO, msg)
 
         try:
             if param[0] == UPLOAD_Q:
@@ -414,6 +446,16 @@ class DC(threading.Thread):
 
                 self.dewar_dict = dict((k, t(v)) for (k, t), v in zip(FieldNames, dewar_list))
                 self.dewar_info = True
+
+                msg = "<- [DB uploader] %s" % cmd
+                self.log.send(self._iam, INFO, msg)
+
+            elif param[0] == UPLOAD_TELRADEC:
+                self.dewar_dict["TELRA"] = float(param[1])
+                self.dewar_dict["TELDEC"] = float(param[2])
+
+                msg = "<- [DB uploader] %s" % cmd
+                self.log.send(self._iam, INFO, msg)
                 
         except:
             self.log.send(self._iam, WARNING, "parsing error")
@@ -697,11 +739,16 @@ class DC(threading.Thread):
                 
                 if bool(int(param[2])):
                     #for simulation
-                    measured_startT = ti.time()    
+                    #modify 20240312
+                    measured_startT = ti.time() 
+                    obs_startT = datetime.datetime.utcnow()   
 
                     #_time_measure = self.reads*2 + self.expTime
                     _time_measure = T_br + (T_frame + self.fowlerTime + (2 * T_frame * self.fowlerNumber))
                     ti.sleep(_time_measure)
+
+                    #add 20240312
+                    obs_endT = datetime.datetime.utcnow()
                     
                     #copy from demo image -> 1st On-Sky images
                     #self.fitsfullpath = "%s/dcs_pack/code/DetCtrl/SDC%s_demo.fits" % (WORKING_DIR, IAM[-1])
@@ -725,7 +772,6 @@ class DC(threading.Thread):
                     path_nextday = path + folder_name_nextday + "/"
                     self.createFolder(path_nextday)
 
-                    cur_datetime = [_t.year, _t.month, _t.day, _t.hour, _t.minute, _t.second, _t.microsecond]
                     folder_name = "%04d%02d%02d" % (_t.year, _t.month, _t.day)
                     path += folder_name + "/"
                     self.createFolder(path)
@@ -748,8 +794,54 @@ class DC(threading.Thread):
 
                     filename = "SDC%s_%s_%04d.fits" % (IAM[-1], folder_name, self.next_idx)
                     full_path = path + filename
-                    copyfile(self.fitsfullpath, full_path)
-                    #self.save_fitsfile_sub(0, full_path, cur_datetime, self.ramps, self.groups, self.reads, True)
+
+                    # add 20240130 for WCS
+                    hdul = fits.open(self.fitsfullpath)
+                    _data = hdul[0].data
+                    _header = hdul[0].header
+                    _img = np.array(_data, dtype = "f")
+
+                    #add 20240312
+                    _t = obs_startT
+                    _obs_start_t = "%02d:%02d:%02d.%04d" % (_t.hour, _t.minute, _t.second, _t.microsecond)
+                    _header["UTSTART"] = (_obs_start_t, "UT at observation start")
+
+                    _t = obs_endT
+                    _obs_end_t = "%02d:%02d:%02d.%04d" % (_t.hour, _t.minute, _t.second, _t.microsecond)
+                    _header["UTEND"] = (_obs_end_t, "UT at observation end")
+
+                    if IAM == DCSS and self.dewar_info: 
+                        #add 20240118 wcs
+                        #flip = bool(self.dewar_dict['flip'])
+
+                        # modify 20240419 cx, cy -> CRPIX_REF[0], [1]
+                        cx = CRPIX_REF[0]
+                        cy = CRPIX_REF[1]
+                        #cx = self.dewar_dict['slitcenX']
+                        #cy = self.dewar_dict['slitcenY']
+
+                        pa = self.dewar_dict['pa']
+                        pixelscale = self.dewar_dict['pixelscale'] / 3600.
+
+                        # add 20240205
+                        _header["RADECSYS"] = ("FK5", "Coordinate System")
+                        _header["TELEPOCH"] = (2000.0, "Current telescope epoch")
+                        _header["IPA"] = (pa, "Instrument position angle")
+                        
+                        update_header2(_header, cx, cy, pa, pixelscale)    
+                                
+                        #if flip:
+                        #    slit_image_flip_func = lambda im: np.rot90(im, 2) 
+                        #else:
+                        #    slit_image_flip_func = lambda im: im
+
+                    fits.writeto(full_path, _img, header=_header, output_verify="ignore", overwrite=True) 
+                    #ekurz - memory management
+                    _img = None
+
+                    hdul.close()
+                    
+                    #copyfile(self.fitsfullpath, full_path)
         
                     measured_durationT = ti.time() - measured_startT
                     
@@ -764,12 +856,12 @@ class DC(threading.Thread):
                         res = False
                     if self.ImageAcquisition() == False:
                         res = False
-                    
-                    msg = "%s %.3f %s %d" % (param[0], self.measured_durationT, self.folder_name, res)
-                    self.publish_to_ics_queue(msg)
+                        
+                    # modify 20240422
+                    if not self.stop:
+                        msg = "%s %.3f %s %d" % (param[0], self.measured_durationT, self.folder_name, res)
+                        self.publish_to_ics_queue(msg)
 
-                    #else:
-                    #    self.publish_to_ics_queue(CMD_STOPACQUISITION)
             
             self.param = None
             self.acquiring = False
@@ -811,6 +903,9 @@ class DC(threading.Thread):
         val = arr.ctypes.data_as(POINTER(c_uint))
         sts = lib.MACIE_ReadASICReg(self.handle, self.slctASICs, asic_addr, val, self._24Bit, self.option)
         
+        #ekurz - memory management
+        arr = None
+        
         return val, sts
 
     
@@ -850,6 +945,8 @@ class DC(threading.Thread):
             arr = np.array(arr_list)
             card = arr.ctypes.data_as(POINTER(c_ushort))
             self.pCard = pointer(pointer(MACIE_CardInfo()))
+            #ekurz - memory management
+            arr = None
 
             sts = lib.MACIE_CheckInterfaces(0, None, 0, card, self.pCard)
             res = ""
@@ -946,6 +1043,8 @@ class DC(threading.Thread):
         arr_list = []
         arr = np.array(arr_list)
         val = arr.ctypes.data_as(POINTER(c_uint))
+        #ekurz - memory management
+        arr = None
 
         # step 2. load MACIE firmware from slot1 or slot2
         if lib.MACIE_loadMACIEFirmware(self.handle, self.slctMACIEs, self.slot1, val) != MACIE_OK:
@@ -981,6 +1080,8 @@ class DC(threading.Thread):
             res = data[1]
 
         self.log.send(self._iam, INFO, "Initialize2 " + RET_OK)
+        #ekurz - memory management
+        arr = None
 
         return True
 
@@ -1070,6 +1171,8 @@ class DC(threading.Thread):
         arr = np.array(arr_list)
         val = arr.ctypes.data_as(POINTER(c_uint))
         msg = ""
+        #ekurz - memory management
+        arr = None
 
         if self.slctMACIEs == 0:
             msg = "Select MACIE = %d invalid" % avaiMACIEs
@@ -1109,6 +1212,9 @@ class DC(threading.Thread):
                 self.log.send(self._iam, INFO, msg)
         msg = "Available ASICs = %d" % self.slctASICs
         self.log.send(self._iam, INFO, msg)
+        #ekurz - memory management
+        arr = None
+        data = None
 
         return True
 
@@ -1144,6 +1250,8 @@ class DC(threading.Thread):
         arr_list = [0 for _ in range(MACIE_ERROR_COUNTERS)]
         arr = np.array(arr_list)
         errArr = arr.ctypes.data_as(POINTER(c_ushort))
+        #ekurz - memory management
+        arr = None
         if lib.MACIE_GetErrorCounters(self.handle, self.slctMACIEs, errArr) != MACIE_OK:
             self.log.send(self._iam, ERROR, "Read MACIE error counter failed")
             return
@@ -1300,6 +1408,8 @@ class DC(threading.Thread):
         arr_list = []
         arr = np.array(arr_list)
         buf = arr.ctypes.data_as(POINTER(c_int))
+        #ekurz - memory management
+        arr = None
 
         sts = lib.MACIE_ConfigureGigeScienceInterface(self.handle, self.slctMACIEs, 0, frameSize, 42037, buf)  # 0-16bit
         if sts != MACIE_OK:
@@ -1324,6 +1434,7 @@ class DC(threading.Thread):
             self.log.send(self._iam, ERROR, msg)
             return False
 
+        self.obs_startT = datetime.datetime.utcnow()    # move 20240423
         if lib.MACIE_WriteASICReg(self.handle, self.slctASICs, ASICAddr_State, 0x8001, self.option) != MACIE_OK:
             self.log.send(self._iam, ERROR, "Triggering " + RET_FAIL)
             return False
@@ -1337,6 +1448,9 @@ class DC(threading.Thread):
     def AcquireRamp_window(self):
 
         self.measured_startT = ti.time()
+        #add 20240312
+        self.obs_startT = datetime.datetime.utcnow()
+
         try:
             cfg = sc.LoadConfig(WORKING_DIR + "DCS/DCS.ini")
             self.preampInputScheme = int(cfg.get("DC", 'preampInputScheme'))   #1
@@ -1349,6 +1463,8 @@ class DC(threading.Thread):
             arr_list = []
             arr = np.array(arr_list)
             data = arr.ctypes.data_as(POINTER(c_ushort))
+            #ekurz - memory management
+            arr = None
 
             data = acquire_win_ramp(self.handle, self.slctMACIEs, self.slctASICs, \
                                     self.preampInputScheme, self.preampInputVal, self.preampGain, \
@@ -1420,18 +1536,24 @@ class DC(threading.Thread):
 
         if self.stop:
             self.log.send(self._iam, INFO, "Stop: Image Acquiring")
-            return False
+            # modify 20240422
+            return True #False
 
         if byte <= 0:
             self.log.send(self._iam, WARNING, "Trigger timeout: no available science data")
             return False
 
-        self.measured_elapsed = ti.time() - self.measured_startT
+        #modify 20240312
+        #self.measured_elapsed = ti.time() - self.measured_startT
+        #self.measured_endT = datetime.datetime.utcnow()
+        self.obs_endT = datetime.datetime.utcnow()
 
         arr_list = []
         arr = np.array(arr_list)
         data = arr.ctypes.data_as(POINTER(c_ushort))
         data = lib.MACIE_ReadGigeScienceFrame(self.handle, int(1500 + 5000))
+        #ekurz - memory management
+        arr = None
 
         if data == None:
             self.log.send(self._iam, WARNING, "Null frame")
@@ -1458,7 +1580,7 @@ class DC(threading.Thread):
 
 
         
-    def WriteFitsFile(self, local = True):
+    def WriteFitsFile(self):
 
         if self.ROIMode:
             self.log.send(self._iam, INFO, "Write Fits file now (ROI)....")
@@ -1588,6 +1710,8 @@ class DC(threading.Thread):
         arr_list = []
         arr = np.array(arr_list, dtype=np.float32)
         res = arr.ctypes.data_as(POINTER(c_float))
+        #ekurz - memory management
+        arr = None
 
         res = fowler_calculation(self.samplingMode, self.reads, idx, data)
 
@@ -1643,9 +1767,10 @@ class DC(threading.Thread):
 
             header_cnt = 0
 
-            y, m, d = cur_datetime[0], cur_datetime[1], cur_datetime[2]
-            _h, _m, _s, _ms = cur_datetime[3], cur_datetime[4], cur_datetime[5], cur_datetime[6]
-            obs_datetime = "%04d-%02d-%02dT%02d:%02d:%02d.%03d" % (y, m, d, _h, _m, _s, _ms)
+            # remove 20240422
+            #y, m, d = cur_datetime[0], cur_datetime[1], cur_datetime[2]
+            #_h, _m, _s, _ms = cur_datetime[3], cur_datetime[4], cur_datetime[5], cur_datetime[6]
+            #obs_datetime = "%04d-%02d-%02dT%02d:%02d:%02d.%03d" % (y, m, d, _h, _m, _s, _ms)
 
             #_num = self.macieSN
             #pHeaders[header_cnt] = MACIE_FitsHdr(key="SERIALN".encode(), valType=HDR_INT, iVal=_num, comment="MACIE serial number".encode())
@@ -1655,30 +1780,51 @@ class DC(threading.Thread):
             #pHeaders[header_cnt] = MACIE_FitsHdr(key="DETECTOR".encode(), valType=HDR_STR, sVal=detector.encode(), comment="name of Detector (MACIE serial number)".encode())
             #header_cnt += 1
 
-            t = Time(obs_datetime, format='isot', scale='utc')
-            julian = t.to_value('jd', 'long')
+            #t = Time(obs_datetime, format='isot', scale='utc')
+            #julian = t.to_value('jd', 'long')
 
-            julian_time = "%f" % julian
-            pHeaders[header_cnt] = MACIE_FitsHdr(key="ACQTIME".encode(), valType=HDR_STR, sVal=julian_time.encode(), comment="UTC Julian date".encode())
+            #julian_time = "%f" % julian
+            #pHeaders[header_cnt] = MACIE_FitsHdr(key="ACQTIME".encode(), valType=HDR_STR, sVal=julian_time.encode(), comment="UTC Julian date".encode())
+            #header_cnt += 1
+
+            #pHeaders[header_cnt] = MACIE_FitsHdr(key="ACQTIME1".encode(), valType=HDR_STR, sVal=obs_datetime.encode(), comment="UTC time (YYYY-MM-DDTHH:MM:SS.MS)".encode())
+            #header_cnt += 1
+
+            #--------------------------------------------------------------------------------------
+            #modify 20240312
+            _t = self.obs_startT
+            # modify 20240422
+            #_obs_start_t = "%02d:%02d:%02d.%04d" % (_t.hour, _t.minute, _t.second, _t.microsecond)
+            _obs_start_t = "%04d-%02d-%02dT%02d:%02d:%02d.%03d" % (_t.year, _t.month, _t.day, _t.hour, _t.minute, _t.second, _t.microsecond)
+            pHeaders[header_cnt] = MACIE_FitsHdr(key="UTSTART".encode(), valType=HDR_STR, sVal=_obs_start_t.encode(), comment="UT at observation start".encode())
             header_cnt += 1
 
-            pHeaders[header_cnt] = MACIE_FitsHdr(key="ACQTIME1".encode(), valType=HDR_STR, sVal=obs_datetime.encode(), comment="UTC time (YYYY-MM-DDTHH:MM:SS.MS)".encode())
+            _t = self.obs_endT
+            # modify 20240422
+            #_obs_end_t = "%02d:%02d:%02d.%04d" % (_t.hour, _t.minute, _t.second, _t.microsecond)
+            _obs_end_t = "%04d-%02d-%02dT%02d:%02d:%02d.%03d" % (_t.year, _t.month, _t.day, _t.hour, _t.minute, _t.second, _t.microsecond)
+            pHeaders[header_cnt] = MACIE_FitsHdr(key="UTEND".encode(), valType=HDR_STR, sVal=_obs_end_t.encode(), comment="UT at observation end".encode())
             header_cnt += 1
-
-            pHeaders[header_cnt] = MACIE_FitsHdr(key="ELAPSED".encode(), valType=HDR_FLOAT, fVal=self.measured_elapsed, comment="Elapsed observation time in seconds".encode())
-            header_cnt += 1
+            #--------------------------------------------------------------------------------------
 
             if IAM == DCSS and self.dewar_info:
-                pHeaders[header_cnt] = MACIE_FitsHdr(key="TELRA".encode(), valType=HDR_STR, sVal=self.dewar_dict['ra'].encode(), comment="Current telescope right ascension".encode())
+                pHeaders[header_cnt] = MACIE_FitsHdr(key="CUR_RA".encode(), valType=HDR_STR, sVal=self.dewar_dict['ra'].encode(), comment="Target right ascension".encode())
+                header_cnt += 1
+                
+                pHeaders[header_cnt] = MACIE_FitsHdr(key="TELRA".encode(), valType=HDR_FLOAT, fVal=self.dewar_dict['ra2'], comment="Current telescope right ascension".encode())
                 header_cnt += 1
 
-                pHeaders[header_cnt] = MACIE_FitsHdr(key="TELDEC".encode(), valType=HDR_STR, sVal=self.dewar_dict['dec'].encode(), comment="Current telescope declination".encode())
+                pHeaders[header_cnt] = MACIE_FitsHdr(key="CUR_DEC".encode(), valType=HDR_STR, sVal=self.dewar_dict['dec'].encode(), comment="Target declination".encode())
+                header_cnt += 1
+                
+                pHeaders[header_cnt] = MACIE_FitsHdr(key="TELDEC".encode(), valType=HDR_FLOAT, fVal=self.dewar_dict['dec2'], comment="Current telescope declination".encode())
                 header_cnt += 1
 
                 pHeaders[header_cnt] = MACIE_FitsHdr(key="AM".encode(), valType=HDR_FLOAT, fVal=self.dewar_dict['airmass'], comment="Airmass at end of observation".encode())
                 header_cnt += 1
 
-            pHeaders[header_cnt] = MACIE_FitsHdr(key="DATATYPE".encode(), valType=HDR_STR, sVal="ADU".encode(), comment="ADC digital steps".encode())
+            #pHeaders[header_cnt] = MACIE_FitsHdr(key="DATATYPE".encode(), valType=HDR_STR, sVal="ADU".encode(), comment="ADC digital steps".encode())
+            pHeaders[header_cnt] = MACIE_FitsHdr(key="BUNIT".encode(), valType=HDR_STR, sVal="ADU".encode(), comment="physical units of the array values".encode())
             header_cnt += 1
 
             pHeaders[header_cnt] = MACIE_FitsHdr(key="MUXTYPE".encode(), valType=HDR_INT, iVal=MUX_TYPE, comment="1- H1RG; 2- H2RG; 4- H4RG".encode())
@@ -1924,13 +2070,18 @@ class DC(threading.Thread):
                 arr = np.array(self.loadimg[idx], dtype=np.int16)
                 data = arr.ctypes.data_as(POINTER(c_ushort))
                 sts = lib.MACIE_WriteFitsFile(c_char_p(filename.encode()), FRAME_X, FRAME_Y, data, header_cnt, pHeaders)
+
+            #ekurz - memory management
+            arr = None
+            data = None
             
             # for tunning test
             if not self.ROIMode and self.samplingMode == UTR_MODE:
                 offset, active = tn.cal_mean(filename)
                 tunning = "%s: %.4f, %.4f" % (self.V_refmain, offset, active)
                 self.log.send(self._iam, DEBUG, tunning)
-        except:
+        except Exception as e:
+            self.log.send(self._iam, ERROR, f'Exception is {traceback.format_exc()}')
             sts = MACIE_FAIL
 
         return sts
@@ -1958,9 +2109,35 @@ class DC(threading.Thread):
         #new_header["COMMENT"] = "This FITS file may contain long string keyword values that are continued over multiple keywords. This convention uses the '&' character at the end of a string which is then continued on subsequent keywords whose name = 'CONTINUE"
 
         new_header["FITSFILE"] = fullpath
-        new_header["CONTINUE"] = filename                
+        new_header["CONTINUE"] = filename        
+        
+        if IAM == DCSS and self.dewar_info:
+            #add 20240118 wcs
+            # modify 20240419 cx, cy -> CRPIX_REF[0], [1]
+            cx = CRPIX_REF[0]
+            cy = CRPIX_REF[1]
+            #cx = self.dewar_dict['slitcenX']
+            #cy = self.dewar_dict['slitcenY']
+            pa = self.dewar_dict['pa']
+            pixelscale = self.dewar_dict['pixelscale'] / 3600.
+
+            # add 20240205
+            new_header["RADECSYS"] = ("FK5", "Coordinate System")
+            new_header["TELEPOCH"] = (2000.0, "Current telescope epoch")
+            new_header["IPA"] = (pa, "Instrument position angle")
+            
+            update_header2(new_header, cx, cy, pa, pixelscale)    
+                
+        #if flip:
+        #    slit_image_flip_func = lambda im: np.rot90(im, 2) #np.fliplr(np.rot90(im))
+        #else:
+        #    slit_image_flip_func = lambda im: im #np.rot90(im)
 
         fits.writeto(fullpath+filename, img, header=new_header, overwrite=True) #, img, header, output_verify='ignore', overwrite=True)
+        
+        #ekurz - memory management
+        img = None
+        
 
         hdulist.close()
 
@@ -1975,12 +2152,20 @@ class DC(threading.Thread):
         tlm = arr.ctypes.data_as(POINTER(c_float))
         if lib.MACIE_GetTelemetryAll(self.handle, self.slctMACIEs, tlm) != MACIE_OK:
             self.log.send(self._iam, ERROR, self.GetErrMsg())
+            
+            #ekurz - memory management
+            arr = None
+            data = None
             return False
         else:
             self.log.send(self._iam, INFO, "MACIE_GetTelemetryAll " +  RET_OK)
             for i in range(79):
                 msg = "%f" % tlm[i]
                 self.log.send(self._iam, INFO, msg)
+            
+        #ekurz - memory management
+        arr = None
+        tlm = None
 
         return True 
 

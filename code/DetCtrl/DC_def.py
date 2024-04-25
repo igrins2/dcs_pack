@@ -129,6 +129,9 @@ ASICAddr = 0x6100
 ASICAddr_State = 0x6900
 
 UPLOAD_Q = "UploadDBQ"    #uploader
+UPLOAD_TELRADEC = "UploadTelRADec"  #uploader
+
+HEART_BEAT = "HeartBeat"
 
 #OBSAPP_BUSY = "ObsAppBusy"
 
