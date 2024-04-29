@@ -3,7 +3,7 @@
 """
 Created on Mar 4, 2022
 
-Modified on March 12, 2024 
+Modified on Apr 24, 2024 
 
 @author: hilee
 """
@@ -84,7 +84,8 @@ FieldNames = [('pressure', float),
               #('flip', int),
               ('slitcenX', int), ('slitcenY', int), 
               ('pa', float), ('pixelscale', float), 
-              ('ra2', float), ('dec2', float)]  
+              ('ra2', float), ('dec2', float),
+              ('RADecSys', str), ('epoch', str)]  
 
 class DC(threading.Thread):
     def __init__(self):
@@ -823,9 +824,12 @@ class DC(threading.Thread):
                         pa = self.dewar_dict['pa']
                         pixelscale = self.dewar_dict['pixelscale'] / 3600.
 
-                        # add 20240205
-                        _header["RADECSYS"] = ("FK5", "Coordinate System")
-                        _header["TELEPOCH"] = (2000.0, "Current telescope epoch")
+                        # add 20240205 -> 20240426
+                        #_header["RADECSYS"] = ("FK5", "Coordinate System")
+                        #_header["TELEPOCH"] = (2000.0, "Current telescope epoch")
+                        _header["RADECSYS"] = (self.dewar_dict['RADecSys'], "Coordinate System !!!")
+                        _header["TELEPOCH"] = (self.dewar_dict['epoch'], "Current telescope epoch")
+
                         _header["IPA"] = (pa, "Instrument position angle")
                         
                         update_header2(_header, cx, cy, pa, pixelscale)    
@@ -851,17 +855,23 @@ class DC(threading.Thread):
                 else:
                     self.acquiring = True   #20231006
 
-                    res = True
-                    if self.AcquireRamp() == False:
-                        res = False
-                    if self.ImageAcquisition() == False:
-                        res = False
-                        
-                    # modify 20240422
-                    if not self.stop:
-                        msg = "%s %.3f %s %d" % (param[0], self.measured_durationT, self.folder_name, res)
-                        self.publish_to_ics_queue(msg)
+                    # modify 20240427
+                    self.folder_name = "-"
 
+                    try:
+                        res = True
+                        if self.AcquireRamp() == False:
+                            res = False
+                        if self.ImageAcquisition() == False:
+                            res = False
+                                                
+                        if not self.stop:
+                            msg = "%s %.3f %s %d" % (param[0], self.measured_durationT, self.folder_name, res)
+                            self.publish_to_ics_queue(msg)
+
+                    except:
+                        msg = "%s 0 %s 0" % (param[0], self.folder_name)
+                        self.publish_to_ics_queue(msg)
             
             self.param = None
             self.acquiring = False
@@ -2121,11 +2131,14 @@ class DC(threading.Thread):
             pa = self.dewar_dict['pa']
             pixelscale = self.dewar_dict['pixelscale'] / 3600.
 
-            # add 20240205
-            new_header["RADECSYS"] = ("FK5", "Coordinate System")
-            new_header["TELEPOCH"] = (2000.0, "Current telescope epoch")
             new_header["IPA"] = (pa, "Instrument position angle")
             
+            # add 20240205 -> 20240426
+            #_header["RADECSYS"] = ("FK5", "Coordinate System")
+            #_header["TELEPOCH"] = (2000.0, "Current telescope epoch")
+            new_header["RADECSYS"] = (self.dewar_dict['RADecSys'], "Coordinate System !!!")
+            new_header["TELEPOCH"] = (self.dewar_dict['epoch'], "Current telescope epoch")
+
             update_header2(new_header, cx, cy, pa, pixelscale)    
                 
         #if flip:
