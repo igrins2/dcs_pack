@@ -721,6 +721,9 @@ class DC(threading.Thread):
                         self.fowlerNumber = int(param[4])
                         self.fowlerTime = float(param[5])
 
+                # add for test 20240725, PLP
+                #self.fowlerNumber += 1
+                
                 if bool(int(param[2])):
                     res = True
                 else:
@@ -1698,6 +1701,7 @@ class DC(threading.Thread):
                     idx += 1
 
         elif self.samplingMode == FOWLER_MODE:  # ramp=1, group=1, read=1,2,4,8,16
+            #20240724 for testing by hilee
             for group in range(2):
                 for read in range(self.reads):
                     filename = "%sH2RG_R01_M%02d_N%02d.fits" % (path2, group+1, read + 1)
@@ -1710,6 +1714,21 @@ class DC(threading.Thread):
                         self.log.send(self._iam, INFO, filename)
 
                     idx += 1
+            '''
+            for ramp in range(self.ramps):
+                for group in range(2):
+                    for read in range(self.reads):
+                        filename = "%sH2RG_R%02d_M%02d_N%02d.fits" % (path2, ramp+1, group+1, read + 1)
+                        sts = self.save_fitsfile_sub(idx, filename, cur_datetime, 1, group+1, read+1)
+
+                        if sts != MACIE_OK:
+                            self.log.send(self._iam, ERROR, self.GetErrMsg())
+                            return None, None
+                        else:
+                            self.log.send(self._iam, INFO, filename)
+
+                        idx += 1
+            '''
     
         startime = ti.time()
 
@@ -2114,7 +2133,8 @@ class DC(threading.Thread):
 
         new_header = hdulist[0].header[:-5]
         
-        new_header["NSAMP"] = (sampling, "Number of Fowler Sampling")
+        #new_header["NSAMP"] = (sampling, "Number of Fowler Sampling")
+        new_header["NSAMP"] = (sampling-1, "Number of Fowler Sampling")
         
         #new_header["COMMENT"] = "This FITS file may contain long string keyword values that are continued over multiple keywords. This convention uses the '&' character at the end of a string which is then continued on subsequent keywords whose name = 'CONTINUE"
 

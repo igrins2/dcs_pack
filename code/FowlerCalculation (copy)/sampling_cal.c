@@ -225,12 +225,11 @@ extern "C"
             //float* res = (float*)malloc(FRAME_X * FRAME_Y * sizeof(float));
             //memset(res, 0, sizeof(float)* (FRAME_X* FRAME_Y));
             float* res = new float[FRAME_X*FRAME_Y];
-            //for (int n = 0; n < reads ; n++) {
-            for (int n = 1; n < reads ; n++) {  // add for test 20240725, PLP
+            for (int n = 0; n < reads ; n++) {
                 for (int row = 0; row < FRAME_Y; row++) {
                     for (int col = 0; col < FRAME_X; col++)
                     {
-                        if(n == 1)  res[(FRAME_X * row) + col] = 0;
+                        if(n == 0)  res[(FRAME_X * row) + col] = 0;
                         res[(FRAME_X * row) + col] += img[reads + n][(FRAME_X * row) + col] - img[n][(FRAME_X * row) + col];
                     }
                 }
@@ -249,8 +248,7 @@ extern "C"
 
             for (int row = 0; row < FRAME_Y; row++) {
                 for (int col = 0; col < FRAME_X; col++)
-                    //res[(FRAME_X * row) + col] /= reads;
-                    res[(FRAME_X * row) + col] /= (reads-1);    // add for test 20240725, PLP
+                    res[(FRAME_X * row) + col] /= reads;
             }
 
             //printf("Finished !!!\r\n");
