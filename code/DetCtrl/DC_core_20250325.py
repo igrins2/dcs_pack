@@ -721,9 +721,8 @@ class DC(threading.Thread):
                         self.fowlerNumber = int(param[4])
                         self.fowlerTime = float(param[5])
 
-                # modify 20250325
-                if IAM != DCSS:
-                    self.fowlerNumber += 1
+                # add for test 20240725, PLP
+                self.fowlerNumber += 1
                 
                 if bool(int(param[2])):
                     res = True
@@ -1882,11 +1881,7 @@ class DC(threading.Thread):
             pHeaders[header_cnt] = MACIE_FitsHdr(key="EXPTIME".encode(), valType=HDR_FLOAT, fVal=self.expTime, comment="sec, Exposure Time".encode())
             header_cnt += 1
             
-            #modify 20250325
-            if IAM == DCSS:
-                pHeaders[header_cnt] = MACIE_FitsHdr(key="FOWLTIME".encode(), valType=HDR_FLOAT, fVal=self.fowlerTime, comment="sec, Time between set fowler sampling".encode())
-            else:
-                pHeaders[header_cnt] = MACIE_FitsHdr(key="FOWLTIME".encode(), valType=HDR_FLOAT, fVal=self.fowlerTime-T_frame, comment="sec, Time between set fowler sampling".encode())
+            pHeaders[header_cnt] = MACIE_FitsHdr(key="FOWLTIME".encode(), valType=HDR_FLOAT, fVal=self.fowlerTime, comment="sec, Time between set fowler sampling".encode())
             header_cnt += 1
 
             if self.ROIMode:
@@ -2138,11 +2133,8 @@ class DC(threading.Thread):
 
         new_header = hdulist[0].header[:-5]
         
-        #modify 20250325
-        if IAM == DCSS:
-            new_header["NSAMP"] = (sampling, "Number of Fowler Sampling")
-        else:
-            new_header["NSAMP"] = (sampling-1, "Number of Fowler Sampling")
+        #new_header["NSAMP"] = (sampling, "Number of Fowler Sampling")
+        new_header["NSAMP"] = (sampling-1, "Number of Fowler Sampling")
         
         #new_header["COMMENT"] = "This FITS file may contain long string keyword values that are continued over multiple keywords. This convention uses the '&' character at the end of a string which is then continued on subsequent keywords whose name = 'CONTINUE"
 

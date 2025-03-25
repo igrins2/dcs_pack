@@ -817,6 +817,7 @@ class MainWindow(Ui_Dialog, QMainWindow):
             folder = QFileDialog.getExistingDirectory(self, "Select Directory", loader)
             if folder:
                 self.e_img_dir.setText(folder)
+                
 
         else:
             loader = self.e_config_dir.text()
